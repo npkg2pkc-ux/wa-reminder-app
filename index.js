@@ -48,6 +48,11 @@ async function startApp() {
   console.log("🚀 Starting WhatsApp Auto Reminder App");
   console.log("========================================\n");
 
+  // Start Express server FIRST (for healthcheck)
+  app.listen(PORT, () => {
+    console.log(`🌐 Server running on port ${PORT}`);
+  });
+
   try {
     // Initialize Google Sheets
     console.log("📊 Initializing Google Sheets...");
@@ -60,30 +65,24 @@ async function startApp() {
     await getHolidays(year);
     console.log("✅ Holidays data loaded\n");
 
-    // Initialize WhatsApp client
+    // Initialize WhatsApp client (non-blocking)
     console.log("📱 Initializing WhatsApp client...");
     initializeClient();
 
     // Start the scheduler
     startScheduler();
 
-    // Start Express server
-    app.listen(PORT, () => {
-      console.log("\n========================================");
-      console.log(`🌐 Server running on http://localhost:${PORT}`);
-      console.log("========================================\n");
-      console.log("📋 Instructions:");
-      console.log("   1. Scan the QR code with WhatsApp");
-      console.log("   2. Open http://localhost:" + PORT + " in your browser");
-      console.log("   3. Configure auto reminders (Friday & Holiday)");
-      console.log("   4. System will automatically send messages!\n");
-      console.log("⏰ Auto Reminder Types:");
-      console.log("   📅 Friday: Sends every Friday at configured time");
-      console.log("   🎌 Holiday: Sends 1 day before Indonesian holidays\n");
-    });
+    console.log("\n========================================");
+    console.log("✅ Application started successfully!");
+    console.log("========================================\n");
+    console.log("📋 Instructions:");
+    console.log("   1. Scan the QR code with WhatsApp (check logs)");
+    console.log("   2. Open the web interface in your browser");
+    console.log("   3. Configure auto reminders (Friday & Holiday)");
+    console.log("   4. System will automatically send messages!\n");
   } catch (error) {
-    console.error("❌ Failed to start application:", error.message);
-    process.exit(1);
+    console.error("❌ Initialization error:", error.message);
+    console.log("⚠️  Server still running, some features may not work");
   }
 }
 

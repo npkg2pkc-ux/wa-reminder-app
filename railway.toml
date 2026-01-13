@@ -6,7 +6,7 @@ pkgs = ["nodejs_18", "chromium", "nss", "atk", "at-spi2-atk", "cups", "libdrm", 
 
 [deploy]
 startCommand = "node index.js"
-healthcheckPath = "/"
+healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

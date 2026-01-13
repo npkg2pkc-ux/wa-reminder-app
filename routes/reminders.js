@@ -9,6 +9,13 @@ const {
 const { getUpcomingHolidays } = require("../holidays");
 
 /**
+ * GET /health - Health check endpoint for Railway
+ */
+router.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+/**
  * Generate a unique ID for reminders
  * Uses timestamp + random string for uniqueness
  */
