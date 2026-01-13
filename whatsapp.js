@@ -1,6 +1,10 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const QRCode = require("qrcode");
 
+// Store latest QR code and connection status
+let latestQRCode = null;
+let connectionStatus = "disconnected";
+
 // Initialize WhatsApp client with LocalAuth for persistent session
 const client = new Client({
   authStrategy: new LocalAuth({
@@ -24,11 +28,15 @@ const client = new Client({
   },
 });
 
-// Display QR code in terminal for authentication
+// Generate and store QR code for authentication
 client.on("qr", async (qr) => {
-  const qrImage = await QRCode.toDataURL(qr);
-  console.log("📱 Scan QR Code using this link:");
-  console.log(qrImage);
+  console.log("📱 New QR Code generated - access /qr to scan");
+  connectionStatus = "waiting_qr";
+  try {
+    latestQRCode = await QRCode.toDataURL(qr);
+  } catch (err) {
+    console.error("Error generating QR code:", err);
+  }
 });
 
 // Log when client is ready
@@ -36,7 +44,9 @@ client.on("ready", async () => {
   console.log("\n========================================");
   console.log("✅ WhatsApp Client is ready!");
   console.log("========================================\n");
-  console.log("✅ WhatsApp Client is ready!");
+  
+  connectionStatus = "connected";
+  latestQRCode = null; // Clear QR code once connected
 
   const chats = await client.getChats();
 
@@ -51,16 +61,19 @@ client.on("ready", async () => {
 // Log authentication success
 client.on("authenticated", () => {
   console.log("🔐 WhatsApp authentication successful!");
+  connectionStatus = "authenticated";
 });
 
 // Handle authentication failure
 client.on("auth_failure", (message) => {
   console.error("❌ WhatsApp authentication failed:", message);
+  connectionStatus = "auth_failed";
 });
 
 // Handle disconnection
 client.on("disconnected", (reason) => {
   console.log("📴 WhatsApp client disconnected:", reason);
+  connectionStatus = "disconnected";
   console.log("🔄 Attempting to reconnect...");
   client.initialize();
 });
@@ -110,9 +123,27 @@ function getClient() {
   return client;
 }
 
+/**
+ * Get the latest QR code as base64 data URL
+ * @returns {string|null} - Base64 QR code image or null
+ */
+function getQRCode() {
+  return latestQRCode;
+}
+
+/**
+ * Get the current connection status
+ * @returns {string} - Connection status
+ */
+function getConnectionStatus() {
+  return connectionStatus;
+}
+
 module.exports = {
   client,
   initializeClient,
   sendMessageToGroup,
   getClient,
+  getQRCode,
+  getConnectionStatus,
 };
