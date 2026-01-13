@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= title %></title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>📱 WhatsApp Auto Reminder</h1>
+        <p class="subtitle">
+          Automatic reminders for Fridays & Indonesian Holidays
+        </p>
+      </header>
+
+      <% if (message) { %>
+      <div class="alert alert-success">✅ <%= message %></div>
+      <% } %> <% if (error) { %>
+      <div class="alert alert-error">❌ <%= error %></div>
+      <% } %>
+
+      <main>
+        <section class="form-section">
+          <h2>📝 Create Auto Reminder</h2>
+          <p class="form-description">
+            Set up automatic reminders - no date selection needed! System will
+            automatically send messages on Fridays and before national holidays.
+          </p>
+
+          <form action="/reminder" method="POST" class="reminder-form">
+            <div class="form-group">
+              <label for="message">Message</label>
+              <textarea
+                id="message"
+                name="message"
+                rows="4"
+                placeholder="Enter your reminder message...&#10;Example: Jangan lupa selesaikan tugas sebelum weekend! 🎉"
+                required
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="trigger_time">⏰ Trigger Time (WIB)</label>
+              <input
+                type="time"
+                id="trigger_time"
+                name="trigger_time"
+                value="08:00"
+                required
+              />
+              <small
+                >Time when reminder will be sent (24-hour format, Jakarta
+                timezone)</small
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="group_id">👥 WhatsApp Group ID</label>
+              <input
+                type="text"
+                id="group_id"
+                name="group_id"
+                placeholder="e.g., 1203630xxxxxxxx@g.us"
+                required
+              />
+              <small>Format: numbers followed by @g.us</small>
+            </div>
+
+            <div class="form-group checkbox-group">
+              <label class="section-label">🔔 Reminder Types</label>
+
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="friday_enabled"
+                  value="true"
+                  checked
+                />
+                <span class="checkmark"></span>
+                <span class="checkbox-text">
+                  <strong>📅 Friday Reminder</strong>
+                  <small>Send every Friday at the specified time</small>
+                </span>
+              </label>
+
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  name="holiday_enabled"
+                  value="true"
+                  checked
+                />
+                <span class="checkmark"></span>
+                <span class="checkbox-text">
+                  <strong>🎌 Holiday Reminder</strong>
+                  <small>Send 1 day before Indonesian national holidays</small>
+                </span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn-submit">
+              🚀 Create Auto Reminder
+            </button>
+          </form>
+        </section>
+
+        <% if (upcomingHolidays && upcomingHolidays.length > 0) { %>
+        <section class="holidays-section">
+          <h2>🎌 Upcoming Indonesian Holidays</h2>
+          <div class="holidays-list">
+            <% upcomingHolidays.forEach(function(holiday) { %>
+            <div class="holiday-item">
+              <span class="holiday-date"><%= holiday.date %></span>
+              <span class="holiday-name"><%= holiday.localName %></span>
+            </div>
+            <% }); %>
+          </div>
+        </section>
+        <% } %>
+
+        <section class="reminders-section">
+          <h2>📋 Configured Auto Reminders</h2>
+          <% if (reminders && reminders.length > 0) { %>
+          <div class="reminders-list">
+            <% reminders.forEach(function(reminder) { %>
+            <div
+              class="reminder-card type-<%= reminder.type %> <%= reminder.enabled ? 'enabled' : 'disabled' %>"
+            >
+              <div class="reminder-header">
+                <span class="reminder-id"><%= reminder.id %></span>
+                <div class="reminder-badges">
+                  <span class="reminder-type <%= reminder.type %>">
+                    <% if (reminder.type === 'friday_auto') { %> 📅 Friday <% }
+                    else if (reminder.type === 'holiday_auto') { %> 🎌 Holiday
+                    <% } %>
+                  </span>
+                  <span
+                    class="reminder-status <%= reminder.enabled ? 'active' : 'inactive' %>"
+                  >
+                    <%= reminder.enabled ? '✅ Active' : '⏸️ Paused' %>
+                  </span>
+                </div>
+              </div>
+              <div class="reminder-body">
+                <p class="reminder-message"><%= reminder.message %></p>
+                <div class="reminder-details">
+                  <span>⏰ <%= reminder.trigger_time %> WIB</span>
+                  <span>👥 <%= reminder.group_id %></span>
+                  <% if (reminder.last_sent) { %>
+                  <span>📤 Last sent: <%= reminder.last_sent %></span>
+                  <% } %>
+                </div>
+              </div>
+              <div class="reminder-actions">
+                <button
+                  class="btn-toggle <%= reminder.enabled ? 'btn-pause' : 'btn-enable' %>"
+                  onclick="toggleReminder('<%= reminder.id %>', <%= reminder.enabled ? 'false' : 'true' %>)"
+                >
+                  <%= reminder.enabled ? '⏸️ Pause' : '▶️ Enable' %>
+                </button>
+                <button
+                  class="btn-delete"
+                  onclick="deleteReminder('<%= reminder.id %>')"
+                >
+                  🗑️ Delete
+                </button>
+              </div>
+            </div>
+            <% }); %>
+          </div>
+          <% } else { %>
+          <div class="no-reminders">
+            <p>📭 No auto reminders configured yet.</p>
+            <p>Create your first one above!</p>
+          </div>
+          <% } %>
+        </section>
+      </main>
+
+      <footer>
+        <p>WhatsApp Auto Reminder App &copy; <%= new Date().getFullYear() %></p>
+        <p class="hint">
+          💡 Tip: Make sure the bot is already a member of the target group
+        </p>
+        <p class="hint">
+          🕐 Timezone: Asia/Jakarta (WIB) | Scheduler runs every minute
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      async function toggleReminder(id, enabled) {
+        try {
+          const response = await fetch("/reminder/toggle", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ id, enabled: String(enabled) }),
+          });
+
+          if (response.ok) {
+            location.reload();
+          } else {
+            alert("Failed to toggle reminder");
+          }
+        } catch (error) {
+          alert("Error: " + error.message);
+        }
+      }
+
+      async function deleteReminder(id) {
+        if (!confirm("Are you sure you want to delete this reminder?")) {
+          return;
+        }
+
+        try {
+          const response = await fetch("/reminder/delete", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ id }),
+          });
+
+          if (response.ok) {
+            location.reload();
+          } else {
+            alert("Failed to delete reminder");
+          }
+        } catch (error) {
+          alert("Error: " + error.message);
+        }
+      }
+    </script>
+  </body>
+</html>

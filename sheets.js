@@ -1,0 +1,327 @@
+const { google } = require("googleapis");
+require("dotenv").config();
+
+// Google Sheets configuration
+const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+const SHEET_NAME = "AutoReminders";
+const RANGE = `${SHEET_NAME}!A:H`;
+
+// Initialize Google Sheets API authentication
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  },
+  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+});
+
+const sheets = google.sheets({ version: "v4", auth });
+
+/**
+ * Initialize the Google Sheet with headers if empty
+ */
+async function initializeSheet() {
+  try {
+    // Check if sheet exists, if not create headers
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `${SHEET_NAME}!A1:H1`,
+    });
+
+    // If no headers exist, add them
+    if (!response.data.values || response.data.values.length === 0) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `${SHEET_NAME}!A1:H1`,
+        valueInputOption: "RAW",
+        resource: {
+          values: [
+            [
+              "id",
+              "message",
+              "group_id",
+              "trigger_time",
+              "type",
+              "rule",
+              "last_sent",
+              "enabled",
+            ],
+          ],
+        },
+      });
+      console.log("📊 Google Sheet initialized with headers for AutoReminders");
+    }
+  } catch (error) {
+    // If sheet doesn't exist, try to create it
+    if (error.message.includes("Unable to parse range")) {
+      console.log("📊 Creating AutoReminders sheet...");
+      try {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: SHEET_ID,
+          resource: {
+            requests: [
+              {
+                addSheet: {
+                  properties: {
+                    title: SHEET_NAME,
+                  },
+                },
+              },
+            ],
+          },
+        });
+
+        // Add headers
+        await sheets.spreadsheets.values.update({
+          spreadsheetId: SHEET_ID,
+          range: `${SHEET_NAME}!A1:H1`,
+          valueInputOption: "RAW",
+          resource: {
+            values: [
+              [
+                "id",
+                "message",
+                "group_id",
+                "trigger_time",
+                "type",
+                "rule",
+                "last_sent",
+                "enabled",
+              ],
+            ],
+          },
+        });
+        console.log("📊 AutoReminders sheet created with headers");
+      } catch (createError) {
+        console.error("❌ Error creating sheet:", createError.message);
+        throw createError;
+      }
+    } else {
+      console.error("❌ Error initializing sheet:", error.message);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Get all auto reminders from Google Sheets
+ * @returns {Promise<Array>} - Array of reminder objects
+ */
+async function getAutoReminders() {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: RANGE,
+    });
+
+    const rows = response.data.values;
+
+    if (!rows || rows.length <= 1) {
+      return [];
+    }
+
+    // Skip header row and map to objects
+    const reminders = rows.slice(1).map((row, index) => ({
+      id: row[0] || "",
+      message: row[1] || "",
+      group_id: row[2] || "",
+      trigger_time: row[3] || "",
+      type: row[4] || "",
+      rule: row[5] || "",
+      last_sent: row[6] || "",
+      enabled: row[7] === "true" || row[7] === "TRUE",
+      rowIndex: index + 2, // Actual row number in sheet (1-indexed, +1 for header)
+    }));
+
+    console.log(
+      `📋 Retrieved ${reminders.length} auto reminders from Google Sheets`
+    );
+    return reminders;
+  } catch (error) {
+    console.error("❌ Error getting auto reminders:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Get enabled auto reminders
+ * @returns {Promise<Array>} - Array of enabled reminder objects
+ */
+async function getEnabledAutoReminders() {
+  const reminders = await getAutoReminders();
+  return reminders.filter((r) => r.enabled === true);
+}
+
+/**
+ * Add a new auto reminder to Google Sheets
+ * @param {Object} data - Reminder data
+ * @returns {Promise<Object>} - The added reminder
+ */
+async function addAutoReminder(data) {
+  try {
+    const { id, message, group_id, trigger_time, type, rule } = data;
+    const last_sent = "";
+    const enabled = "true";
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: RANGE,
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+      resource: {
+        values: [
+          [id, message, group_id, trigger_time, type, rule, last_sent, enabled],
+        ],
+      },
+    });
+
+    console.log(`✅ Auto reminder added with ID: ${id}`);
+    return {
+      id,
+      message,
+      group_id,
+      trigger_time,
+      type,
+      rule,
+      last_sent,
+      enabled: true,
+    };
+  } catch (error) {
+    console.error("❌ Error adding auto reminder:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Update the last_sent date of a reminder
+ * @param {string} id - The reminder ID
+ * @param {string} date - The date in YYYY-MM-DD format
+ * @returns {Promise<boolean>} - Success status
+ */
+async function updateLastSent(id, date) {
+  try {
+    // First, get all reminders to find the row index
+    const reminders = await getAutoReminders();
+    const reminder = reminders.find((r) => r.id === id);
+
+    if (!reminder) {
+      console.error(`❌ Reminder with ID ${id} not found`);
+      return false;
+    }
+
+    // Update the last_sent column (column G)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${SHEET_NAME}!G${reminder.rowIndex}`,
+      valueInputOption: "RAW",
+      resource: {
+        values: [[date]],
+      },
+    });
+
+    console.log(`✅ Reminder ${id} last_sent updated to: ${date}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error updating last_sent:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Update the enabled status of a reminder
+ * @param {string} id - The reminder ID
+ * @param {boolean} enabled - The new enabled status
+ * @returns {Promise<boolean>} - Success status
+ */
+async function updateReminderEnabled(id, enabled) {
+  try {
+    const reminders = await getAutoReminders();
+    const reminder = reminders.find((r) => r.id === id);
+
+    if (!reminder) {
+      console.error(`❌ Reminder with ID ${id} not found`);
+      return false;
+    }
+
+    // Update the enabled column (column H)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `${SHEET_NAME}!H${reminder.rowIndex}`,
+      valueInputOption: "RAW",
+      resource: {
+        values: [[enabled ? "true" : "false"]],
+      },
+    });
+
+    console.log(`✅ Reminder ${id} enabled updated to: ${enabled}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error updating reminder enabled status:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Delete an auto reminder
+ * @param {string} id - The reminder ID
+ * @returns {Promise<boolean>} - Success status
+ */
+async function deleteAutoReminder(id) {
+  try {
+    const reminders = await getAutoReminders();
+    const reminder = reminders.find((r) => r.id === id);
+
+    if (!reminder) {
+      console.error(`❌ Reminder with ID ${id} not found`);
+      return false;
+    }
+
+    // Get the sheet ID first
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: SHEET_ID,
+    });
+
+    const sheet = spreadsheet.data.sheets.find(
+      (s) => s.properties.title === SHEET_NAME
+    );
+    if (!sheet) {
+      console.error(`❌ Sheet ${SHEET_NAME} not found`);
+      return false;
+    }
+
+    // Delete the row
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SHEET_ID,
+      resource: {
+        requests: [
+          {
+            deleteDimension: {
+              range: {
+                sheetId: sheet.properties.sheetId,
+                dimension: "ROWS",
+                startIndex: reminder.rowIndex - 1,
+                endIndex: reminder.rowIndex,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    console.log(`✅ Reminder ${id} deleted`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error deleting reminder:", error.message);
+    throw error;
+  }
+}
+
+module.exports = {
+  initializeSheet,
+  getAutoReminders,
+  getEnabledAutoReminders,
+  addAutoReminder,
+  updateLastSent,
+  updateReminderEnabled,
+  deleteAutoReminder,
+};
