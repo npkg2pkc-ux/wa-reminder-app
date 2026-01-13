@@ -27,13 +27,17 @@ app.use(express.static(path.join(__dirname, "public")));
 const server = app.listen(PORT, HOST, () => {
   console.log(`🌐 Server running on ${HOST}:${PORT}`);
   console.log("✅ Health check endpoint ready at /health");
-  
+
   // Initialize other services AFTER server is up
   initializeServices();
 });
 
 // Lazy load other modules to speed up server start
-let initializeClient, initializeSheet, startScheduler, getHolidays, reminderRoutes;
+let initializeClient,
+  initializeSheet,
+  startScheduler,
+  getHolidays,
+  reminderRoutes;
 
 async function initializeServices() {
   console.log("\n========================================");
@@ -47,7 +51,7 @@ async function initializeServices() {
     const scheduler = require("./scheduler");
     const holidays = require("./holidays");
     reminderRoutes = require("./routes/reminders");
-    
+
     initializeClient = whatsapp.initializeClient;
     initializeSheet = sheets.initializeSheet;
     startScheduler = scheduler.startScheduler;

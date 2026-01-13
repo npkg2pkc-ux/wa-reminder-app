@@ -6,21 +6,54 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const SHEET_NAME = "AutoReminders";
 const RANGE = `${SHEET_NAME}!A:H`;
 
-// Initialize Google Sheets API authentication
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-  },
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
+// Get private key with proper formatting
+function getPrivateKey() {
+  const key = process.env.GOOGLE_PRIVATE_KEY;
+  if (!key) {
+    console.error("❌ GOOGLE_PRIVATE_KEY is not set!");
+    return null;
+  }
+  // Handle both escaped and unescaped newlines
+  return key.replace(/\\n/g, "\n");
+}
 
-const sheets = google.sheets({ version: "v4", auth });
+// Initialize Google Sheets API authentication
+let auth = null;
+let sheets = null;
+
+function initAuth() {
+  const privateKey = getPrivateKey();
+  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  
+  if (!privateKey || !clientEmail || !SHEET_ID) {
+    console.error("❌ Missing Google Sheets credentials:");
+    console.error("   - GOOGLE_SHEET_ID:", SHEET_ID ? "✓" : "✗");
+    console.error("   - GOOGLE_SERVICE_ACCOUNT_EMAIL:", clientEmail ? "✓" : "✗");
+    console.error("   - GOOGLE_PRIVATE_KEY:", privateKey ? "✓" : "✗");
+    return false;
+  }
+
+  auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: clientEmail,
+      private_key: privateKey,
+    },
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+
+  sheets = google.sheets({ version: "v4", auth });
+  return true;
+}
 
 /**
  * Initialize the Google Sheet with headers if empty
  */
 async function initializeSheet() {
+  // Initialize auth first
+  if (!initAuth()) {
+    throw new Error("Failed to initialize Google Sheets authentication");
+  }
+
   try {
     // Check if sheet exists, if not create headers
     const response = await sheets.spreadsheets.values.get({
