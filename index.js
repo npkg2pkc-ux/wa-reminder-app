@@ -18,7 +18,7 @@ app.get("/qr", (req, res) => {
     const whatsapp = require("./whatsapp");
     const qrCode = whatsapp.getQRCode();
     const status = whatsapp.getConnectionStatus();
-    
+
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -40,22 +40,34 @@ app.get("/qr", (req, res) => {
       <body>
         <div class="container">
           <h1>📱 WhatsApp Connection</h1>
-          <div class="status ${status === 'connected' ? 'connected' : status === 'waiting_qr' ? 'waiting' : 'disconnected'}">
-            Status: ${status.toUpperCase().replace('_', ' ')}
+          <div class="status ${
+            status === "connected"
+              ? "connected"
+              : status === "waiting_qr"
+              ? "waiting"
+              : "disconnected"
+          }">
+            Status: ${status.toUpperCase().replace("_", " ")}
           </div>
-          ${qrCode ? `
+          ${
+            qrCode
+              ? `
             <div>
               <p>Scan this QR code with WhatsApp:</p>
               <img src="${qrCode}" alt="QR Code">
               <p><small>Page refreshes every 5 seconds</small></p>
             </div>
-          ` : status === 'connected' ? `
+          `
+              : status === "connected"
+              ? `
             <p>✅ WhatsApp is connected!</p>
             <p><a href="/">Go to Dashboard</a></p>
-          ` : `
+          `
+              : `
             <p>⏳ Waiting for QR code...</p>
             <p><small>Page refreshes every 5 seconds</small></p>
-          `}
+          `
+          }
         </div>
       </body>
       </html>
@@ -150,6 +162,17 @@ async function initializeServices() {
     // Start the scheduler
     startScheduler();
 
+    // Add error handling middleware AFTER routes are loaded
+    app.use((err, req, res, next) => {
+      console.error("❌ Server Error:", err.message);
+      res.status(500).json({ error: "Internal server error" });
+    });
+
+    // Add 404 handler LAST
+    app.use((req, res) => {
+      res.status(404).send("Page not found");
+    });
+
     console.log("\n========================================");
     console.log("✅ All services initialized!");
     console.log("========================================\n");
@@ -158,17 +181,6 @@ async function initializeServices() {
     console.log("⚠️  Server still running for healthcheck");
   }
 }
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("❌ Server Error:", err.message);
-  res.status(500).json({ error: "Internal server error" });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).send("Page not found");
-});
 
 // Handle graceful shutdown
 process.on("SIGINT", () => {

@@ -44,7 +44,7 @@ client.on("ready", async () => {
   console.log("\n========================================");
   console.log("✅ WhatsApp Client is ready!");
   console.log("========================================\n");
-  
+
   connectionStatus = "connected";
   latestQRCode = null; // Clear QR code once connected
 
