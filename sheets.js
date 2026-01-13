@@ -24,11 +24,14 @@ let sheets = null;
 function initAuth() {
   const privateKey = getPrivateKey();
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  
+
   if (!privateKey || !clientEmail || !SHEET_ID) {
     console.error("❌ Missing Google Sheets credentials:");
     console.error("   - GOOGLE_SHEET_ID:", SHEET_ID ? "✓" : "✗");
-    console.error("   - GOOGLE_SERVICE_ACCOUNT_EMAIL:", clientEmail ? "✓" : "✗");
+    console.error(
+      "   - GOOGLE_SERVICE_ACCOUNT_EMAIL:",
+      clientEmail ? "✓" : "✗"
+    );
     console.error("   - GOOGLE_PRIVATE_KEY:", privateKey ? "✓" : "✗");
     return false;
   }

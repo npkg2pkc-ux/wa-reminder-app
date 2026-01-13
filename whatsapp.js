@@ -1,5 +1,5 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const qrcode = require("qrcode-terminal");
+const QRCode = require("qrcode");
 
 // Initialize WhatsApp client with LocalAuth for persistent session
 const client = new Client({
@@ -25,11 +25,10 @@ const client = new Client({
 });
 
 // Display QR code in terminal for authentication
-client.on("qr", (qr) => {
-  console.log("\n========================================");
-  console.log("📱 Scan this QR code with WhatsApp:");
-  console.log("========================================\n");
-  qrcode.generate(qr, { small: true });
+client.on("qr", async (qr) => {
+  const qrImage = await QRCode.toDataURL(qr);
+  console.log("📱 Scan QR Code using this link:");
+  console.log(qrImage);
 });
 
 // Log when client is ready
