@@ -21,8 +21,14 @@ app.get("/health", (req, res) => {
 // Initialize WhatsApp and Sheets
 let whatsapp = null;
 let sheets = null;
+let initStarted = false;
 
 async function init() {
+  if (initStarted) return;
+  initStarted = true;
+  
+  console.log("🔄 Starting initialization...");
+  
   try {
     sheets = require("./sheets");
     await sheets.initializeSheet();
@@ -33,10 +39,13 @@ async function init() {
 
   try {
     whatsapp = require("./whatsapp");
-    await whatsapp.initialize();
-    console.log("✅ WhatsApp initializing...");
+    // Don't await - let it run in background
+    whatsapp.initialize().catch(err => {
+      console.error("❌ WhatsApp init error:", err.message);
+    });
+    console.log("✅ WhatsApp starting (background)...");
   } catch (err) {
-    console.error("❌ WhatsApp error:", err.message);
+    console.error("❌ WhatsApp require error:", err.message);
   }
 }
 
@@ -82,7 +91,10 @@ app.get("/api/groups", async (req, res) => {
   try {
     const status = whatsapp ? whatsapp.getConnectionStatus() : "disconnected";
     if (status !== "connected") {
-      return res.json({ success: false, error: "WhatsApp tidak terhubung. Status: " + status });
+      return res.json({
+        success: false,
+        error: "WhatsApp tidak terhubung. Status: " + status,
+      });
     }
     const groups = await whatsapp.getGroups();
     res.json({ success: true, groups });

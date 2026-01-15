@@ -7,85 +7,113 @@ const {
 const QRCode = require("qrcode");
 const pino = require("pino");
 const fs = require("fs");
-const path = require("path");
 
 let sock = null;
 let latestQRCode = null;
-let connectionStatus = "disconnected";
+let connectionStatus = "initializing";
 let groupList = [];
+let isInitializing = false;
 
 const AUTH_FOLDER = "./auth_info";
 
-// Silent logger for Baileys
-const logger = pino({ level: "silent" });
+// Logger with info level to see what's happening
+const logger = pino({ level: "warn" });
 
 // Initialize WhatsApp connection
 async function initialize() {
+  if (isInitializing) {
+    console.log("⚠️ Already initializing...");
+    return;
+  }
+  
+  isInitializing = true;
+  connectionStatus = "initializing";
+  
   console.log("🚀 Starting WhatsApp (Baileys)...");
 
-  // Ensure auth folder exists
-  if (!fs.existsSync(AUTH_FOLDER)) {
-    fs.mkdirSync(AUTH_FOLDER, { recursive: true });
-  }
-
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-  const { version } = await fetchLatestBaileysVersion();
-
-  sock = makeWASocket({
-    version,
-    auth: state,
-    logger,
-    printQRInTerminal: false,
-    browser: ["WhatsApp Reminder", "Chrome", "1.0.0"],
-    connectTimeoutMs: 60000,
-    qrTimeout: 60000,
-  });
-
-  // Handle connection updates
-  sock.ev.on("connection.update", async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      console.log("📱 QR Code generated - scan with WhatsApp");
-      connectionStatus = "waiting_qr";
-      try {
-        latestQRCode = await QRCode.toDataURL(qr);
-      } catch (err) {
-        console.error("QR error:", err.message);
-      }
+  try {
+    // Ensure auth folder exists
+    if (!fs.existsSync(AUTH_FOLDER)) {
+      fs.mkdirSync(AUTH_FOLDER, { recursive: true });
     }
 
-    if (connection === "close") {
-      const reason = lastDisconnect?.error?.output?.statusCode;
-      console.log("📴 Connection closed, reason:", reason);
+    console.log("📂 Auth folder ready");
+    
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
+    console.log("🔐 Auth state loaded");
+    
+    const { version } = await fetchLatestBaileysVersion();
+    console.log("📦 Baileys version:", version);
 
-      if (reason === DisconnectReason.loggedOut) {
-        console.log("🔒 Logged out - clearing session");
-        connectionStatus = "logged_out";
-        // Clear auth folder
-        if (fs.existsSync(AUTH_FOLDER)) {
-          fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+    sock = makeWASocket({
+      version,
+      auth: state,
+      logger,
+      printQRInTerminal: true, // Also print in terminal for debugging
+      browser: ["Reminder Bot", "Chrome", "1.0.0"],
+      connectTimeoutMs: 60000,
+      qrTimeout: 40000,
+    });
+
+    console.log("🔌 Socket created, waiting for events...");
+
+    // Handle connection updates
+    sock.ev.on("connection.update", async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+      
+      console.log("📡 Connection update:", { connection, hasQR: !!qr });
+
+      if (qr) {
+        console.log("📱 QR Code received!");
+        connectionStatus = "waiting_qr";
+        try {
+          latestQRCode = await QRCode.toDataURL(qr);
+          console.log("✅ QR Code converted to base64");
+        } catch (err) {
+          console.error("❌ QR convert error:", err.message);
         }
-      } else {
-        connectionStatus = "disconnected";
-        // Reconnect after delay
-        console.log("🔄 Reconnecting in 5 seconds...");
-        setTimeout(() => initialize(), 5000);
       }
-    }
 
-    if (connection === "open") {
-      console.log("✅ WhatsApp Connected!");
-      connectionStatus = "connected";
-      latestQRCode = null;
+      if (connection === "close") {
+        isInitializing = false;
+        const reason = lastDisconnect?.error?.output?.statusCode;
+        console.log("📴 Connection closed, reason:", reason);
 
-      // Load groups
-      await loadGroups();
-    }
-  });
+        if (reason === DisconnectReason.loggedOut) {
+          console.log("🔒 Logged out - clearing session");
+          connectionStatus = "logged_out";
+          latestQRCode = null;
+          if (fs.existsSync(AUTH_FOLDER)) {
+            fs.rmSync(AUTH_FOLDER, { recursive: true, force: true });
+          }
+          // Restart after logout
+          setTimeout(() => initialize(), 3000);
+        } else {
+          connectionStatus = "disconnected";
+          console.log("🔄 Reconnecting in 3 seconds...");
+          setTimeout(() => initialize(), 3000);
+        }
+      }
 
-  // Save credentials on update
-  sock.ev.on("creds.update", saveCreds);
+      if (connection === "open") {
+        console.log("✅ WhatsApp Connected!");
+        connectionStatus = "connected";
+        latestQRCode = null;
+        isInitializing = false;
+        await loadGroups();
+      }
+    });
+
+    // Save credentials on update
+    sock.ev.on("creds.update", saveCreds);
+    
+  } catch (err) {
+    console.error("❌ Initialize error:", err.message);
+    connectionStatus = "error";
+    isInitializing = false;
+    // Retry after error
+    setTimeout(() => initialize(), 5000);
+  }
 }
 
 // Load all groups

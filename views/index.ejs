@@ -586,13 +586,13 @@
           try {
               const res = await fetch('/api/qr');
               const data = await res.json();
-              
+
               if (data.status === 'connected') {
                   // Connected! Reload page
                   location.reload();
                   return;
               }
-              
+
               const qrDisplay = document.getElementById('qrDisplay');
               if (data.qrCode) {
                   qrDisplay.innerHTML = '<img src="' + data.qrCode + '" alt="QR Code" style="max-width: 250px; border-radius: 10px;">';
@@ -603,7 +603,7 @@
               console.error('QR refresh error:', err);
           }
       }
-      
+
       // Refresh QR every 3 seconds
       refreshQR();
       setInterval(refreshQR, 3000);
