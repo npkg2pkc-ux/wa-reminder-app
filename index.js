@@ -22,13 +22,14 @@ app.get("/health", (req, res) => {
 let whatsapp = null;
 let sheets = null;
 let initStarted = false;
+let initError = null;
 
 async function init() {
   if (initStarted) return;
   initStarted = true;
-  
+
   console.log("🔄 Starting initialization...");
-  
+
   try {
     sheets = require("./sheets");
     await sheets.initializeSheet();
@@ -38,14 +39,21 @@ async function init() {
   }
 
   try {
+    console.log("📱 Loading WhatsApp module...");
     whatsapp = require("./whatsapp");
-    // Don't await - let it run in background
-    whatsapp.initialize().catch(err => {
-      console.error("❌ WhatsApp init error:", err.message);
+    console.log("📱 WhatsApp module loaded, starting...");
+    
+    whatsapp.initialize().then(() => {
+      console.log("✅ WhatsApp initialize() completed");
+    }).catch((err) => {
+      console.error("❌ WhatsApp init error:", err);
+      initError = err.message;
     });
+    
     console.log("✅ WhatsApp starting (background)...");
   } catch (err) {
-    console.error("❌ WhatsApp require error:", err.message);
+    console.error("❌ WhatsApp require error:", err);
+    initError = err.message;
   }
 }
 
@@ -78,9 +86,16 @@ app.get("/", async (req, res) => {
 // API: Get QR code
 app.get("/api/qr", (req, res) => {
   try {
-    const status = whatsapp ? whatsapp.getConnectionStatus() : "disconnected";
+    const status = whatsapp ? whatsapp.getConnectionStatus() : "not_loaded";
     const qrCode = whatsapp ? whatsapp.getQRCode() : null;
-    res.json({ success: true, status, qrCode });
+    res.json({ 
+      success: true, 
+      status, 
+      qrCode,
+      initStarted,
+      initError,
+      whatsappLoaded: !!whatsapp
+    });
   } catch (err) {
     res.json({ success: false, error: err.message });
   }

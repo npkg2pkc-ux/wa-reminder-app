@@ -16,7 +16,7 @@ let isInitializing = false;
 
 const AUTH_FOLDER = "./auth_info";
 
-// Logger 
+// Logger
 const logger = pino({ level: "silent" });
 
 // Initialize WhatsApp connection
@@ -25,10 +25,10 @@ async function initialize() {
     console.log("⚠️ Already initializing...");
     return;
   }
-  
+
   isInitializing = true;
   connectionStatus = "initializing";
-  
+
   console.log("🚀 Starting WhatsApp...");
 
   try {
@@ -53,7 +53,7 @@ async function initialize() {
     // Handle connection updates
     sock.ev.on("connection.update", async (update) => {
       const { connection, lastDisconnect, qr } = update;
-      
+
       if (qr) {
         console.log("📱 QR received!");
         connectionStatus = "waiting_qr";
@@ -69,9 +69,9 @@ async function initialize() {
         isInitializing = false;
         const statusCode = lastDisconnect?.error?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        
+
         console.log("📴 Closed:", statusCode, "reconnect:", shouldReconnect);
-        
+
         if (shouldReconnect) {
           connectionStatus = "reconnecting";
           setTimeout(() => initialize(), 3000);
@@ -95,7 +95,6 @@ async function initialize() {
     });
 
     sock.ev.on("creds.update", saveCreds);
-    
   } catch (err) {
     console.error("❌ Init error:", err);
     connectionStatus = "error";
