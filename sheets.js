@@ -207,13 +207,6 @@ async function getAutoReminders() {
       `📋 Retrieved ${reminders.length} auto reminders from Google Sheets`
     );
 
-    // Log parsed trigger times for debugging
-    reminders.forEach((r) => {
-      console.log(
-        `   - ${r.id}: trigger_time="${r.trigger_time}", type=${r.type}, enabled=${r.enabled}`
-      );
-    });
-
     return reminders;
   } catch (error) {
     console.error("❌ Error getting auto reminders:", error.message);
@@ -313,10 +306,30 @@ async function updateLastSent(id, date) {
  */
 async function updateReminderEnabled(id, enabled) {
   try {
-    const reminders = await getAutoReminders();
-    const reminder = reminders.find((r) => r.id === id);
+    console.log(`🔄 Updating reminder ${id} enabled status to: ${enabled}`);
+    
+    // Get fresh data to ensure correct row index
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: RANGE,
+    });
 
-    if (!reminder) {
+    const rows = response.data.values;
+    if (!rows || rows.length <= 1) {
+      console.error(`❌ No reminders found in sheet`);
+      return false;
+    }
+
+    // Find the exact row index
+    let targetRowIndex = -1;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === id) {
+        targetRowIndex = i + 1; // Convert to 1-based row number for Sheets API
+        break;
+      }
+    }
+
+    if (targetRowIndex === -1) {
       console.error(`❌ Reminder with ID ${id} not found`);
       return false;
     }
@@ -324,14 +337,14 @@ async function updateReminderEnabled(id, enabled) {
     // Update the enabled column (column H)
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!H${reminder.rowIndex}`,
+      range: `${SHEET_NAME}!H${targetRowIndex}`,
       valueInputOption: "RAW",
       resource: {
         values: [[enabled ? "true" : "false"]],
       },
     });
 
-    console.log(`✅ Reminder ${id} enabled updated to: ${enabled}`);
+    console.log(`✅ Reminder ${id} enabled updated to: ${enabled} (row ${targetRowIndex})`);
     return true;
   } catch (error) {
     console.error("❌ Error updating reminder enabled status:", error.message);
@@ -339,22 +352,55 @@ async function updateReminderEnabled(id, enabled) {
   }
 }
 
+// Mutex to prevent concurrent delete operations
+let isDeleting = false;
+
 /**
  * Delete an auto reminder
  * @param {string} id - The reminder ID
  * @returns {Promise<boolean>} - Success status
  */
 async function deleteAutoReminder(id) {
+  // Prevent concurrent deletes which can cause row index issues
+  if (isDeleting) {
+    console.log(`⏳ Delete operation in progress, waiting...`);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  isDeleting = true;
+  
   try {
-    const reminders = await getAutoReminders();
-    const reminder = reminders.find((r) => r.id === id);
+    console.log(`🗑️ Attempting to delete reminder: ${id}`);
+    
+    // Always get fresh data to ensure correct row index
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: RANGE,
+    });
 
-    if (!reminder) {
-      console.error(`❌ Reminder with ID ${id} not found`);
+    const rows = response.data.values;
+    if (!rows || rows.length <= 1) {
+      console.error(`❌ No reminders found in sheet`);
       return false;
     }
 
-    // Get the sheet ID first
+    // Find the exact row index (0-based for data, but row 1 is header)
+    let targetRowIndex = -1;
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][0] === id) {
+        targetRowIndex = i; // This is the 0-based index in the values array
+        break;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      console.error(`❌ Reminder with ID ${id} not found in sheet`);
+      return false;
+    }
+
+    console.log(`   Found at row index: ${targetRowIndex + 1} (1-based)`);
+
+    // Get the sheet ID
     const spreadsheet = await sheets.spreadsheets.get({
       spreadsheetId: SHEET_ID,
     });
@@ -367,7 +413,8 @@ async function deleteAutoReminder(id) {
       return false;
     }
 
-    // Delete the row
+    // Delete the row using 0-based index for the API
+    // startIndex is 0-based, so row 2 in sheet = index 1
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SHEET_ID,
       resource: {
@@ -377,8 +424,8 @@ async function deleteAutoReminder(id) {
               range: {
                 sheetId: sheet.properties.sheetId,
                 dimension: "ROWS",
-                startIndex: reminder.rowIndex - 1,
-                endIndex: reminder.rowIndex,
+                startIndex: targetRowIndex, // 0-based: row 2 = index 1
+                endIndex: targetRowIndex + 1,
               },
             },
           },
@@ -386,11 +433,13 @@ async function deleteAutoReminder(id) {
       },
     });
 
-    console.log(`✅ Reminder ${id} deleted`);
+    console.log(`✅ Reminder ${id} deleted successfully from row ${targetRowIndex + 1}`);
     return true;
   } catch (error) {
     console.error("❌ Error deleting reminder:", error.message);
     throw error;
+  } finally {
+    isDeleting = false;
   }
 }
 
