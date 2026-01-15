@@ -217,48 +217,208 @@ function getLocalHolidays(year) {
 }
 
 /**
- * Check if tomorrow is a national holiday
+ * Check if a specific date is a weekend (Saturday or Sunday)
+ * @param {Date} date - Date object
+ * @returns {boolean} - True if weekend
+ */
+function isWeekend(date) {
+  const day = date.getDay();
+  return day === 0 || day === 6; // 0 = Sunday, 6 = Saturday
+}
+
+/**
+ * Check if a specific date is a national holiday
+ * @param {Date} date - Date object
+ * @param {Array} holidays - Array of holiday objects
+ * @returns {Object|null} - Holiday object if date is a holiday, null otherwise
+ */
+function isNationalHoliday(date, holidays) {
+  const dateStr = formatDateYYYYMMDD(date);
+  return holidays.find((h) => h.date === dateStr) || null;
+}
+
+/**
+ * Check if tomorrow starts a holiday period (holiday or weekend connected to holiday)
+ * This function checks if:
+ * 1. Today is a working day (not weekend, not holiday)
+ * 2. Tomorrow is a national holiday, OR
+ * 3. Tomorrow is weekend AND there's a national holiday connected to it
+ *
+ * For type "holiday_auto" with rule "before_national_holiday":
+ * - Reminder is sent 1 working day before a national holiday
+ * - If the holiday connects with weekend (e.g., Friday holiday + Sat/Sun),
+ *   reminder is sent on Thursday
+ *
  * @param {Date} today - Today's date (in Jakarta timezone)
- * @returns {Promise<Object|null>} - Holiday object if tomorrow is a holiday, null otherwise
+ * @returns {Promise<Object|null>} - Holiday info if reminder should be sent, null otherwise
  */
 async function checkTomorrowHoliday(today) {
   try {
-    // Calculate tomorrow's date
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const year = today.getFullYear();
+    const todayStr = formatDateYYYYMMDD(today);
 
-    const year = tomorrow.getFullYear();
-    const tomorrowStr = formatDateYYYYMMDD(tomorrow);
+    console.log(
+      `🔍 Checking holiday reminder for today: ${todayStr} (${getDayName(
+        today
+      )})`
+    );
 
-    console.log(`🔍 Checking if ${tomorrowStr} is a holiday...`);
-
-    // Get holidays for the year
+    // Get holidays for current and next year
     const holidays = await getHolidays(year);
-
-    // Also check next year if we're near year end
     let allHolidays = [...holidays];
-    if (tomorrow.getMonth() === 0 && today.getMonth() === 11) {
-      // Tomorrow is January but today is December - need next year's holidays
-      const nextYearHolidays = await getHolidays(year);
+
+    // Also fetch next year if near end of year
+    if (today.getMonth() >= 10) {
+      const nextYearHolidays = await getHolidays(year + 1);
       allHolidays = [...allHolidays, ...nextYearHolidays];
     }
 
-    // Find if tomorrow is a holiday
-    const holiday = allHolidays.find((h) => h.date === tomorrowStr);
-
-    if (holiday) {
-      console.log(
-        `🎉 Tomorrow (${tomorrowStr}) is a holiday: ${holiday.localName}`
-      );
-      return holiday;
+    // Check if TODAY is already a weekend or holiday - if so, don't send reminder
+    if (isWeekend(today)) {
+      console.log(`📅 Today (${todayStr}) is weekend, no reminder needed`);
+      return null;
     }
 
-    console.log(`📅 Tomorrow (${tomorrowStr}) is not a holiday`);
+    const todayHoliday = isNationalHoliday(today, allHolidays);
+    if (todayHoliday) {
+      console.log(
+        `📅 Today (${todayStr}) is already a holiday (${todayHoliday.localName}), no reminder needed`
+      );
+      return null;
+    }
+
+    // Look for the upcoming holiday period starting from tomorrow
+    // Check if there's a national holiday in the next few days that starts tomorrow or connects via weekend
+    const upcomingHoliday = findUpcomingHolidayPeriod(today, allHolidays);
+
+    if (upcomingHoliday) {
+      return upcomingHoliday;
+    }
+
+    console.log(`📅 No upcoming holiday period found, no reminder needed`);
     return null;
   } catch (error) {
     console.error("❌ Error checking tomorrow holiday:", error.message);
     return null;
   }
+}
+
+/**
+ * Find if there's an upcoming holiday period starting tomorrow
+ * This handles cases like:
+ * - Tomorrow is a national holiday
+ * - Tomorrow is weekend and there's a holiday on Monday (long weekend)
+ * - Tomorrow is Friday holiday, followed by weekend
+ *
+ * @param {Date} today - Today's date
+ * @param {Array} allHolidays - Array of all holidays
+ * @returns {Object|null} - Holiday info if found
+ */
+function findUpcomingHolidayPeriod(today, allHolidays) {
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = formatDateYYYYMMDD(tomorrow);
+
+  console.log(
+    `🔍 Checking if ${tomorrowStr} (${getDayName(
+      tomorrow
+    )}) starts a holiday period...`
+  );
+
+  // Case 1: Tomorrow is a national holiday
+  const tomorrowHoliday = isNationalHoliday(tomorrow, allHolidays);
+  if (tomorrowHoliday) {
+    console.log(
+      `🎉 Tomorrow (${tomorrowStr}) is a NATIONAL HOLIDAY: ${tomorrowHoliday.localName}`
+    );
+    return tomorrowHoliday;
+  }
+
+  // Case 2: Tomorrow is weekend - check if there's a holiday connected
+  if (isWeekend(tomorrow)) {
+    // Look ahead through the weekend and beyond to find connected holidays
+    const connectedHoliday = findConnectedHoliday(tomorrow, allHolidays);
+
+    if (connectedHoliday) {
+      console.log(
+        `🎉 Tomorrow (${tomorrowStr}) is ${getDayName(
+          tomorrow
+        )}, connected to holiday: ${connectedHoliday.localName} on ${
+          connectedHoliday.date
+        }`
+      );
+      return {
+        date: tomorrowStr,
+        localName: `Akhir Pekan + ${connectedHoliday.localName}`,
+        name: `Weekend connected to ${connectedHoliday.name}`,
+        isWeekend: true,
+        connectedHoliday: connectedHoliday,
+      };
+    }
+
+    // Regular weekend (Saturday) - ALSO send reminder for weekend
+    // This ensures reminder is sent every Friday before Saturday-Sunday
+    console.log(
+      `📅 Tomorrow (${tomorrowStr}) is ${getDayName(
+        tomorrow
+      )} - regular weekend, sending reminder`
+    );
+    return {
+      date: tomorrowStr,
+      localName: "Akhir Pekan (Sabtu-Minggu)",
+      name: "Weekend",
+      isWeekend: true,
+      isRegularWeekend: true,
+    };
+  }
+
+  // Tomorrow is a regular working day
+  console.log(`📅 Tomorrow (${tomorrowStr}) is a regular working day`);
+  return null;
+}
+
+/**
+ * Get day name in English
+ * @param {Date} date - Date object
+ * @returns {string} - Day name
+ */
+function getDayName(date) {
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  return days[date.getDay()];
+}
+
+/**
+ * Find if there's a national holiday connected to a weekend
+ * Looks ahead from the given date to find holidays within the same period
+ * @param {Date} startDate - Starting date (should be a weekend day)
+ * @param {Array} holidays - Array of holiday objects
+ * @returns {Object|null} - Connected holiday if found
+ */
+function findConnectedHoliday(startDate, holidays) {
+  // Look ahead up to 7 days to find connected holidays
+  for (let i = 0; i <= 7; i++) {
+    const checkDate = new Date(startDate);
+    checkDate.setDate(checkDate.getDate() + i);
+
+    const holiday = isNationalHoliday(checkDate, holidays);
+    if (holiday) {
+      return holiday;
+    }
+
+    // If we hit a working day (not weekend, not holiday), stop looking
+    if (!isWeekend(checkDate) && !holiday) {
+      break;
+    }
+  }
+  return null;
 }
 
 /**
@@ -319,4 +479,7 @@ module.exports = {
   formatDateYYYYMMDD,
   getUpcomingHolidays,
   clearHolidayCache,
+  isWeekend,
+  isNationalHoliday,
+  getDayName,
 };

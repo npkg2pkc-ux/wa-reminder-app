@@ -67,8 +67,17 @@ async function processFridayReminders(reminders, now, todayStr, currentTime) {
 
   for (const reminder of fridayReminders) {
     try {
+      // Trim trigger_time to handle any whitespace issues from spreadsheet
+      const reminderTriggerTime = (reminder.trigger_time || "").trim();
+
+      console.log(`   Checking reminder ${reminder.id}:`);
+      console.log(`     - Trigger time in sheet: "${reminderTriggerTime}"`);
+      console.log(`     - Current time: "${currentTime}"`);
+      console.log(`     - Last sent: "${reminder.last_sent || "never"}"`);
+
       // Check if trigger time matches current time
-      if (reminder.trigger_time !== currentTime) {
+      if (reminderTriggerTime !== currentTime) {
+        console.log(`     - ⏰ Time not matched, skipping`);
         continue;
       }
 
@@ -101,7 +110,7 @@ async function processFridayReminders(reminders, now, todayStr, currentTime) {
 }
 
 /**
- * Process Holiday auto reminders (1 day before national holiday)
+ * Process Holiday auto reminders (1 day before holiday/weekend period)
  * @param {Array} reminders - Array of holiday_auto reminders
  * @param {Date} now - Current Jakarta time
  * @param {string} todayStr - Today's date in YYYY-MM-DD format
@@ -115,23 +124,35 @@ async function processHolidayReminders(reminders, now, todayStr, currentTime) {
   }
 
   console.log("🎌 Checking holiday reminders...");
+  console.log(`   Found ${holidayReminders.length} holiday_auto reminder(s)`);
 
-  // Check if tomorrow is a holiday
+  // Check if tomorrow starts a holiday period (national holiday or weekend)
   const tomorrowHoliday = await checkTomorrowHoliday(now);
 
   if (!tomorrowHoliday) {
-    console.log("📅 Tomorrow is not a national holiday");
+    console.log(
+      "📅 Tomorrow is a regular working day - no holiday reminder needed"
+    );
     return;
   }
 
   console.log(
-    `🎉 Tomorrow is ${tomorrowHoliday.localName}! Processing holiday reminders...`
+    `🎉 Tomorrow starts a holiday period: ${tomorrowHoliday.localName}! Processing holiday reminders...`
   );
 
   for (const reminder of holidayReminders) {
     try {
+      // Trim trigger_time to handle any whitespace issues from spreadsheet
+      const reminderTriggerTime = (reminder.trigger_time || "").trim();
+
+      console.log(`   Checking reminder ${reminder.id}:`);
+      console.log(`     - Trigger time in sheet: "${reminderTriggerTime}"`);
+      console.log(`     - Current time: "${currentTime}"`);
+      console.log(`     - Last sent: "${reminder.last_sent || "never"}"`);
+
       // Check if trigger time matches current time
-      if (reminder.trigger_time !== currentTime) {
+      if (reminderTriggerTime !== currentTime) {
+        console.log(`     - ⏰ Time not matched, skipping`);
         continue;
       }
 
@@ -141,8 +162,24 @@ async function processHolidayReminders(reminders, now, todayStr, currentTime) {
         continue;
       }
 
-      // Enhance message with holiday info
-      const enhancedMessage = `${reminder.message}\n\n📅 Besok adalah ${tomorrowHoliday.localName} (${tomorrowHoliday.date})`;
+      // Enhance message with holiday info (only for national holidays, not regular weekends)
+      let enhancedMessage = reminder.message;
+
+      if (tomorrowHoliday.isRegularWeekend) {
+        // Regular weekend - just send the original message without extra info
+        // The message already mentions about coordination before holidays
+        enhancedMessage = reminder.message;
+      } else if (
+        tomorrowHoliday.isWeekend &&
+        tomorrowHoliday.connectedHoliday
+      ) {
+        // Weekend connected to national holiday
+        const holidayDescription = `${tomorrowHoliday.connectedHoliday.localName} (${tomorrowHoliday.connectedHoliday.date}) + Akhir Pekan`;
+        enhancedMessage = `${reminder.message}\n\n📅 Besok adalah ${holidayDescription}`;
+      } else {
+        // National holiday
+        enhancedMessage = `${reminder.message}\n\n📅 Besok adalah ${tomorrowHoliday.localName} (${tomorrowHoliday.date})`;
+      }
 
       console.log(`\n📤 Sending Holiday reminder: ${reminder.id}`);
       console.log(`   Holiday: ${tomorrowHoliday.localName}`);

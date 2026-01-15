@@ -140,6 +140,40 @@ async function initializeSheet() {
 }
 
 /**
+ * Convert Excel/Sheets time value to HH:mm format
+ * Excel stores time as a decimal fraction of a day (e.g., 0.5 = 12:00)
+ * @param {string|number} timeValue - Time value from sheet
+ * @returns {string} - Time in HH:mm format
+ */
+function parseTimeValue(timeValue) {
+  if (!timeValue) return "";
+
+  // If it's already in HH:mm format, return as-is (trimmed)
+  const strValue = String(timeValue).trim();
+  if (/^\d{1,2}:\d{2}$/.test(strValue)) {
+    // Ensure HH:mm format with leading zero
+    const [hours, minutes] = strValue.split(":");
+    return `${hours.padStart(2, "0")}:${minutes}`;
+  }
+
+  // If it's a decimal (Excel time format), convert it
+  const numValue = parseFloat(strValue);
+  if (!isNaN(numValue) && numValue >= 0 && numValue < 1) {
+    const totalMinutes = Math.round(numValue * 24 * 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}`;
+  }
+
+  // If it's a larger number, might be total minutes or some other format
+  // Just return trimmed string
+  return strValue;
+}
+
+/**
  * Get all auto reminders from Google Sheets
  * @returns {Promise<Array>} - Array of reminder objects
  */
@@ -161,7 +195,7 @@ async function getAutoReminders() {
       id: row[0] || "",
       message: row[1] || "",
       group_id: row[2] || "",
-      trigger_time: row[3] || "",
+      trigger_time: parseTimeValue(row[3]),
       type: row[4] || "",
       rule: row[5] || "",
       last_sent: row[6] || "",
@@ -172,6 +206,14 @@ async function getAutoReminders() {
     console.log(
       `📋 Retrieved ${reminders.length} auto reminders from Google Sheets`
     );
+
+    // Log parsed trigger times for debugging
+    reminders.forEach((r) => {
+      console.log(
+        `   - ${r.id}: trigger_time="${r.trigger_time}", type=${r.type}, enabled=${r.enabled}`
+      );
+    });
+
     return reminders;
   } catch (error) {
     console.error("❌ Error getting auto reminders:", error.message);
