@@ -10,7 +10,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.9",
+    "baileys": "^7.0.0-rc.9",
     "dotenv": "^16.6.1",
     "ejs": "^3.1.10",
     "express": "^4.22.1",

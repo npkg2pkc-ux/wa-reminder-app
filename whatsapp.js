@@ -2,7 +2,8 @@ const {
   default: makeWASocket,
   DisconnectReason,
   useMultiFileAuthState,
-} = require("@whiskeysockets/baileys");
+  fetchLatestBaileysVersion,
+} = require("baileys");
 const QRCode = require("qrcode");
 const pino = require("pino");
 const fs = require("fs");
@@ -28,7 +29,7 @@ async function initialize() {
   isInitializing = true;
   connectionStatus = "initializing";
   
-  console.log("🚀 Starting WhatsApp (Baileys v6)...");
+  console.log("🚀 Starting WhatsApp...");
 
   try {
     // Ensure auth folder exists
@@ -37,12 +38,13 @@ async function initialize() {
     }
 
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_FOLDER);
-    console.log("🔐 Auth state loaded");
+    const { version } = await fetchLatestBaileysVersion();
+    console.log("🔐 Using version:", version);
 
     sock = makeWASocket({
+      version,
       auth: state,
       logger,
-      printQRInTerminal: true,
       browser: ["Reminder", "Chrome", "1.0"],
     });
 
