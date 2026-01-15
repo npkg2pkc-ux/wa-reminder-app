@@ -1,13 +1,8 @@
-const {
-  default: makeWASocket,
-  DisconnectReason,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-} = require("baileys");
 const QRCode = require("qrcode");
 const pino = require("pino");
 const fs = require("fs");
 
+let baileys = null;
 let sock = null;
 let latestQRCode = null;
 let connectionStatus = "initializing";
@@ -15,9 +10,15 @@ let groupList = [];
 let isInitializing = false;
 
 const AUTH_FOLDER = "./auth_info";
-
-// Logger
 const logger = pino({ level: "silent" });
+
+// Load baileys dynamically (ESM module)
+async function loadBaileys() {
+  if (!baileys) {
+    baileys = await import("baileys");
+  }
+  return baileys;
+}
 
 // Initialize WhatsApp connection
 async function initialize() {
@@ -32,6 +33,9 @@ async function initialize() {
   console.log("🚀 Starting WhatsApp...");
 
   try {
+    // Load baileys
+    const { default: makeWASocket, DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion } = await loadBaileys();
+    
     // Ensure auth folder exists
     if (!fs.existsSync(AUTH_FOLDER)) {
       fs.mkdirSync(AUTH_FOLDER, { recursive: true });
@@ -112,7 +116,6 @@ async function loadGroups() {
       name: g.subject,
     }));
     console.log(`📋 Loaded ${groupList.length} groups`);
-    groupList.forEach((g) => console.log(`  - ${g.name} => ${g.id}`));
   } catch (err) {
     console.error("Failed to load groups:", err.message);
   }
@@ -123,8 +126,6 @@ async function getGroups() {
   if (connectionStatus !== "connected") {
     throw new Error(`Status: ${connectionStatus}`);
   }
-
-  // Refresh group list
   await loadGroups();
   return groupList;
 }
@@ -145,17 +146,14 @@ async function sendMessage(chatId, message) {
   }
 }
 
-// Get QR Code
 function getQRCode() {
   return latestQRCode;
 }
 
-// Get connection status
 function getConnectionStatus() {
   return connectionStatus;
 }
 
-// Logout and clear session
 async function logout() {
   if (sock) {
     await sock.logout();
