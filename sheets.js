@@ -3,40 +3,23 @@ require("dotenv").config();
 
 // Google Sheets configuration
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-const SHEET_NAME = "AutoReminders";
-const RANGE = `${SHEET_NAME}!A:H`;
+const SHEET_NAME = "Reminders";
 
-// Get private key with proper formatting
-function getPrivateKey() {
-  const key = process.env.GOOGLE_PRIVATE_KEY;
-  if (!key) {
-    console.error("❌ GOOGLE_PRIVATE_KEY is not set!");
-    return null;
-  }
-  // Handle both escaped and unescaped newlines
-  return key.replace(/\\n/g, "\n");
-}
-
-// Initialize Google Sheets API authentication
-let auth = null;
 let sheets = null;
 
-function initAuth() {
-  const privateKey = getPrivateKey();
+// Initialize Google Sheets
+function initSheets() {
+  if (sheets) return true;
+  
+  const privateKey = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, "\n");
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
   if (!privateKey || !clientEmail || !SHEET_ID) {
-    console.error("❌ Missing Google Sheets credentials:");
-    console.error("   - GOOGLE_SHEET_ID:", SHEET_ID ? "✓" : "✗");
-    console.error(
-      "   - GOOGLE_SERVICE_ACCOUNT_EMAIL:",
-      clientEmail ? "✓" : "✗"
-    );
-    console.error("   - GOOGLE_PRIVATE_KEY:", privateKey ? "✓" : "✗");
+    console.error("❌ Missing Google Sheets credentials");
     return false;
   }
 
-  auth = new google.auth.GoogleAuth({
+  const auth = new google.auth.GoogleAuth({
     credentials: {
       client_email: clientEmail,
       private_key: privateKey,
@@ -48,432 +31,184 @@ function initAuth() {
   return true;
 }
 
-/**
- * Initialize the Google Sheet with headers if empty
- */
+// Generate simple ID
+function generateId() {
+  return 'R' + Date.now().toString(36).toUpperCase();
+}
+
+// Initialize sheet with headers
 async function initializeSheet() {
-  // Initialize auth first
-  if (!initAuth()) {
-    throw new Error("Failed to initialize Google Sheets authentication");
-  }
+  if (!initSheets()) throw new Error("Failed to init Google Sheets");
 
   try {
-    // Check if sheet exists, if not create headers
-    const response = await sheets.spreadsheets.values.get({
+    const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!A1:H1`,
+      range: `${SHEET_NAME}!A1:G1`,
     });
 
-    // If no headers exist, add them
-    if (!response.data.values || response.data.values.length === 0) {
+    if (!res.data.values || res.data.values.length === 0) {
       await sheets.spreadsheets.values.update({
         spreadsheetId: SHEET_ID,
-        range: `${SHEET_NAME}!A1:H1`,
+        range: `${SHEET_NAME}!A1:G1`,
         valueInputOption: "RAW",
         resource: {
-          values: [
-            [
-              "id",
-              "message",
-              "group_id",
-              "trigger_time",
-              "type",
-              "rule",
-              "last_sent",
-              "enabled",
-            ],
-          ],
+          values: [["id", "name", "send_date", "send_time", "target_id", "message", "status"]],
         },
       });
-      console.log("📊 Google Sheet initialized with headers for AutoReminders");
+      console.log("📊 Sheet initialized with headers");
     }
   } catch (error) {
-    // If sheet doesn't exist, try to create it
     if (error.message.includes("Unable to parse range")) {
-      console.log("📊 Creating AutoReminders sheet...");
-      try {
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId: SHEET_ID,
-          resource: {
-            requests: [
-              {
-                addSheet: {
-                  properties: {
-                    title: SHEET_NAME,
-                  },
-                },
-              },
-            ],
-          },
-        });
-
-        // Add headers
-        await sheets.spreadsheets.values.update({
-          spreadsheetId: SHEET_ID,
-          range: `${SHEET_NAME}!A1:H1`,
-          valueInputOption: "RAW",
-          resource: {
-            values: [
-              [
-                "id",
-                "message",
-                "group_id",
-                "trigger_time",
-                "type",
-                "rule",
-                "last_sent",
-                "enabled",
-              ],
-            ],
-          },
-        });
-        console.log("📊 AutoReminders sheet created with headers");
-      } catch (createError) {
-        console.error("❌ Error creating sheet:", createError.message);
-        throw createError;
-      }
+      // Create sheet
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        resource: {
+          requests: [{ addSheet: { properties: { title: SHEET_NAME } } }],
+        },
+      });
+      await initializeSheet();
     } else {
-      console.error("❌ Error initializing sheet:", error.message);
       throw error;
     }
   }
 }
 
-/**
- * Convert Excel/Sheets time value to HH:mm format
- * Excel stores time as a decimal fraction of a day (e.g., 0.5 = 12:00)
- * @param {string|number} timeValue - Time value from sheet
- * @returns {string} - Time in HH:mm format
- */
-function parseTimeValue(timeValue) {
-  if (!timeValue) return "";
-
-  // If it's already in HH:mm format, return as-is (trimmed)
-  const strValue = String(timeValue).trim();
-  if (/^\d{1,2}:\d{2}$/.test(strValue)) {
-    // Ensure HH:mm format with leading zero
-    const [hours, minutes] = strValue.split(":");
-    return `${hours.padStart(2, "0")}:${minutes}`;
-  }
-
-  // If it's a decimal (Excel time format), convert it
-  const numValue = parseFloat(strValue);
-  if (!isNaN(numValue) && numValue >= 0 && numValue < 1) {
-    const totalMinutes = Math.round(numValue * 24 * 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-      2,
-      "0"
-    )}`;
-  }
-
-  // If it's a larger number, might be total minutes or some other format
-  // Just return trimmed string
-  return strValue;
-}
-
-/**
- * Ensure sheets API is initialized
- */
-function ensureAuth() {
-  if (!sheets) {
-    if (!initAuth()) {
-      throw new Error("Failed to initialize Google Sheets authentication");
-    }
-  }
-}
-
-/**
- * Get all auto reminders from Google Sheets
- * @returns {Promise<Array>} - Array of reminder objects
- */
-async function getAutoReminders() {
-  ensureAuth();
-
+// Get all reminders
+async function getReminders() {
+  if (!initSheets()) return [];
+  
   try {
-    const response = await sheets.spreadsheets.values.get({
+    const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: RANGE,
+      range: `${SHEET_NAME}!A:G`,
     });
 
-    const rows = response.data.values;
+    const rows = res.data.values || [];
+    if (rows.length <= 1) return [];
 
-    if (!rows || rows.length <= 1) {
-      return [];
-    }
-
-    // Skip header row and map to objects
-    const reminders = rows.slice(1).map((row, index) => ({
-      id: row[0] || "",
-      message: row[1] || "",
-      group_id: row[2] || "",
-      trigger_time: parseTimeValue(row[3]),
-      type: row[4] || "",
-      rule: row[5] || "",
-      last_sent: row[6] || "",
-      enabled: row[7] === "true" || row[7] === "TRUE",
-      rowIndex: index + 2, // Actual row number in sheet (1-indexed, +1 for header)
-    }));
-
-    console.log(
-      `📋 Retrieved ${reminders.length} auto reminders from Google Sheets`
-    );
-
-    return reminders;
+    return rows.slice(1).map(row => ({
+      id: row[0] || '',
+      name: row[1] || '',
+      send_date: row[2] || '',
+      send_time: row[3] || '',
+      target_id: row[4] || '',
+      message: row[5] || '',
+      status: row[6] || 'pending',
+    })).filter(r => r.id);
   } catch (error) {
-    console.error("❌ Error getting auto reminders:", error.message);
-    throw error;
+    console.error("❌ Error getting reminders:", error.message);
+    return [];
   }
 }
 
-/**
- * Get enabled auto reminders
- * @returns {Promise<Array>} - Array of enabled reminder objects
- */
-async function getEnabledAutoReminders() {
-  const reminders = await getAutoReminders();
-  return reminders.filter((r) => r.enabled === true);
+// Add new reminder
+async function addReminder(data) {
+  if (!initSheets()) throw new Error("Failed to init Google Sheets");
+
+  const id = generateId();
+  const row = [
+    id,
+    data.name || '',
+    data.send_date || '',
+    data.send_time || '',
+    data.target_id || '',
+    data.message || '',
+    'pending'
+  ];
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!A:G`,
+    valueInputOption: "RAW",
+    resource: { values: [row] },
+  });
+
+  console.log("✅ Reminder added:", id);
+  return id;
 }
 
-/**
- * Add a new auto reminder to Google Sheets
- * @param {Object} data - Reminder data
- * @returns {Promise<Object>} - The added reminder
- */
-async function addAutoReminder(data) {
-  ensureAuth();
+// Delete reminder by ID
+async function deleteReminder(id) {
+  if (!initSheets()) throw new Error("Failed to init Google Sheets");
 
-  try {
-    const { id, message, group_id, trigger_time, type, rule } = data;
-    const last_sent = "";
-    const enabled = "true";
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!A:G`,
+  });
 
-    await sheets.spreadsheets.values.append({
-      spreadsheetId: SHEET_ID,
-      range: RANGE,
-      valueInputOption: "RAW",
-      insertDataOption: "INSERT_ROWS",
-      resource: {
-        values: [
-          [id, message, group_id, trigger_time, type, rule, last_sent, enabled],
-        ],
-      },
-    });
+  const rows = res.data.values || [];
+  const rowIndex = rows.findIndex(row => row[0] === id);
 
-    console.log(`✅ Auto reminder added with ID: ${id}`);
-    return {
-      id,
-      message,
-      group_id,
-      trigger_time,
-      type,
-      rule,
-      last_sent,
-      enabled: true,
-    };
-  } catch (error) {
-    console.error("❌ Error adding auto reminder:", error.message);
-    throw error;
-  }
-}
-
-/**
- * Update the last_sent date of a reminder
- * @param {string} id - The reminder ID
- * @param {string} date - The date in YYYY-MM-DD format
- * @returns {Promise<boolean>} - Success status
- */
-async function updateLastSent(id, date) {
-  ensureAuth();
-
-  try {
-    // First, get all reminders to find the row index
-    const reminders = await getAutoReminders();
-    const reminder = reminders.find((r) => r.id === id);
-
-    if (!reminder) {
-      console.error(`❌ Reminder with ID ${id} not found`);
-      return false;
-    }
-
-    // Update the last_sent column (column G)
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!G${reminder.rowIndex}`,
-      valueInputOption: "RAW",
-      resource: {
-        values: [[date]],
-      },
-    });
-
-    console.log(`✅ Reminder ${id} last_sent updated to: ${date}`);
-    return true;
-  } catch (error) {
-    console.error("❌ Error updating last_sent:", error.message);
-    throw error;
-  }
-}
-
-/**
- * Update the enabled status of a reminder
- * @param {string} id - The reminder ID
- * @param {boolean} enabled - The new enabled status
- * @returns {Promise<boolean>} - Success status
- */
-async function updateReminderEnabled(id, enabled) {
-  ensureAuth();
-
-  try {
-    console.log(`🔄 Updating reminder ${id} enabled status to: ${enabled}`);
-
-    // Get fresh data to ensure correct row index
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: RANGE,
-    });
-
-    const rows = response.data.values;
-    if (!rows || rows.length <= 1) {
-      console.error(`❌ No reminders found in sheet`);
-      return false;
-    }
-
-    // Find the exact row index
-    let targetRowIndex = -1;
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][0] === id) {
-        targetRowIndex = i + 1; // Convert to 1-based row number for Sheets API
-        break;
-      }
-    }
-
-    if (targetRowIndex === -1) {
-      console.error(`❌ Reminder with ID ${id} not found`);
-      return false;
-    }
-
-    // Update the enabled column (column H)
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!H${targetRowIndex}`,
-      valueInputOption: "RAW",
-      resource: {
-        values: [[enabled ? "true" : "false"]],
-      },
-    });
-
-    console.log(
-      `✅ Reminder ${id} enabled updated to: ${enabled} (row ${targetRowIndex})`
-    );
-    return true;
-  } catch (error) {
-    console.error("❌ Error updating reminder enabled status:", error.message);
-    throw error;
-  }
-}
-
-// Mutex to prevent concurrent delete operations
-let isDeleting = false;
-
-/**
- * Delete an auto reminder
- * @param {string} id - The reminder ID
- * @returns {Promise<boolean>} - Success status
- */
-async function deleteAutoReminder(id) {
-  ensureAuth();
-
-  // Prevent concurrent deletes which can cause row index issues
-  if (isDeleting) {
-    console.log(`⏳ Delete operation in progress, waiting...`);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  if (rowIndex === -1) {
+    throw new Error("Reminder not found");
   }
 
-  isDeleting = true;
+  // Get sheet ID
+  const sheetInfo = await sheets.spreadsheets.get({
+    spreadsheetId: SHEET_ID,
+  });
+  const sheet = sheetInfo.data.sheets.find(s => s.properties.title === SHEET_NAME);
+  const sheetId = sheet.properties.sheetId;
 
-  try {
-    console.log(`🗑️ Attempting to delete reminder: ${id}`);
-
-    // Always get fresh data to ensure correct row index
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: RANGE,
-    });
-
-    const rows = response.data.values;
-    if (!rows || rows.length <= 1) {
-      console.error(`❌ No reminders found in sheet`);
-      return false;
-    }
-
-    // Find the exact row index (0-based for data, but row 1 is header)
-    let targetRowIndex = -1;
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][0] === id) {
-        targetRowIndex = i; // This is the 0-based index in the values array
-        break;
-      }
-    }
-
-    if (targetRowIndex === -1) {
-      console.error(`❌ Reminder with ID ${id} not found in sheet`);
-      return false;
-    }
-
-    console.log(`   Found at row index: ${targetRowIndex + 1} (1-based)`);
-
-    // Get the sheet ID
-    const spreadsheet = await sheets.spreadsheets.get({
-      spreadsheetId: SHEET_ID,
-    });
-
-    const sheet = spreadsheet.data.sheets.find(
-      (s) => s.properties.title === SHEET_NAME
-    );
-    if (!sheet) {
-      console.error(`❌ Sheet ${SHEET_NAME} not found`);
-      return false;
-    }
-
-    // Delete the row using 0-based index for the API
-    // startIndex is 0-based, so row 2 in sheet = index 1
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: SHEET_ID,
-      resource: {
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId: sheet.properties.sheetId,
-                dimension: "ROWS",
-                startIndex: targetRowIndex, // 0-based: row 2 = index 1
-                endIndex: targetRowIndex + 1,
-              },
-            },
+  // Delete row
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    resource: {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId: sheetId,
+            dimension: "ROWS",
+            startIndex: rowIndex,
+            endIndex: rowIndex + 1,
           },
-        ],
-      },
-    });
+        },
+      }],
+    },
+  });
 
-    console.log(
-      `✅ Reminder ${id} deleted successfully from row ${targetRowIndex + 1}`
-    );
-    return true;
-  } catch (error) {
-    console.error("❌ Error deleting reminder:", error.message);
-    throw error;
-  } finally {
-    isDeleting = false;
+  console.log("✅ Reminder deleted:", id);
+  return true;
+}
+
+// Update reminder status
+async function updateStatus(id, status) {
+  if (!initSheets()) throw new Error("Failed to init Google Sheets");
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!A:G`,
+  });
+
+  const rows = res.data.values || [];
+  const rowIndex = rows.findIndex(row => row[0] === id);
+
+  if (rowIndex === -1) {
+    throw new Error("Reminder not found");
   }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SHEET_ID,
+    range: `${SHEET_NAME}!G${rowIndex + 1}`,
+    valueInputOption: "RAW",
+    resource: { values: [[status]] },
+  });
+
+  console.log("✅ Status updated:", id, "->", status);
+  return true;
+}
+
+// Get reminder by ID
+async function getReminder(id) {
+  const reminders = await getReminders();
+  return reminders.find(r => r.id === id);
 }
 
 module.exports = {
   initializeSheet,
-  getAutoReminders,
-  getEnabledAutoReminders,
-  addAutoReminder,
-  updateLastSent,
-  updateReminderEnabled,
-  deleteAutoReminder,
+  getReminders,
+  addReminder,
+  deleteReminder,
+  updateStatus,
+  getReminder,
 };

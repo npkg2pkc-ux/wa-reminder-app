@@ -2,11 +2,16 @@
 builder = "nixpacks"
 
 [build.nixpacks]
-pkgs = ["nodejs_18", "chromium", "nss", "atk", "at-spi2-atk", "cups", "libdrm", "libxkbcommon", "xorg.libXcomposite", "xorg.libXdamage", "xorg.libXfixes", "xorg.libXrandr", "mesa", "alsa-lib"]
+pkgs = ["nodejs_18", "chromium"]
 
 [deploy]
-startCommand = "node index.js"
+startCommand = "node --max-old-space-size=256 index.js"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+
+[variables]
+PUPPETEER_EXECUTABLE_PATH = "/nix/store/x205pbkd5xh5g4iv0g58xjla55has3cx-chromium-108.0.5359.94/bin/chromium"
+PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+NODE_OPTIONS = "--max-old-space-size=256"
