@@ -48,7 +48,12 @@ app.get("/", async (req, res) => {
     const reminders = sheets ? await sheets.getReminders() : [];
 
     res.render("index", {
-      status: status === "connected" ? "connected" : (qrCode ? "waiting_qr" : "disconnected"),
+      status:
+        status === "connected"
+          ? "connected"
+          : qrCode
+          ? "waiting_qr"
+          : "disconnected",
       qrCode,
       reminders,
     });
@@ -78,12 +83,18 @@ app.get("/api/groups", async (req, res) => {
 app.post("/api/reminders", async (req, res) => {
   try {
     const { name, send_date, send_time, target_id, message } = req.body;
-    
+
     if (!send_date || !send_time || !target_id || !message) {
       return res.json({ success: false, error: "Semua field harus diisi" });
     }
 
-    const id = await sheets.addReminder({ name, send_date, send_time, target_id, message });
+    const id = await sheets.addReminder({
+      name,
+      send_date,
+      send_time,
+      target_id,
+      message,
+    });
     res.json({ success: true, id });
   } catch (err) {
     res.json({ success: false, error: err.message });
@@ -114,7 +125,7 @@ app.post("/api/reminders/:id/send", async (req, res) => {
 
     await whatsapp.sendMessage(reminder.target_id, reminder.message);
     await sheets.updateStatus(req.params.id, "sent");
-    
+
     res.json({ success: true });
   } catch (err) {
     res.json({ success: false, error: err.message });
@@ -130,7 +141,10 @@ app.post("/api/test-send", async (req, res) => {
 
     const { targetId, message } = req.body;
     if (!targetId || !message) {
-      return res.json({ success: false, error: "targetId dan message diperlukan" });
+      return res.json({
+        success: false,
+        error: "targetId dan message diperlukan",
+      });
     }
 
     await whatsapp.sendMessage(targetId, message);
@@ -141,46 +155,52 @@ app.post("/api/test-send", async (req, res) => {
 });
 
 // Scheduler: Check every minute
-cron.schedule("* * * * *", async () => {
-  if (!whatsapp || whatsapp.getConnectionStatus() !== "connected") {
-    return;
-  }
-
-  try {
-    const now = new Date();
-    const jakartaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-    
-    const todayStr = jakartaTime.toISOString().split("T")[0]; // YYYY-MM-DD
-    const hours = String(jakartaTime.getHours()).padStart(2, "0");
-    const minutes = String(jakartaTime.getMinutes()).padStart(2, "0");
-    const currentTime = `${hours}:${minutes}`;
-
-    console.log(`⏰ [${todayStr} ${currentTime}] Checking reminders...`);
-
-    const reminders = await sheets.getReminders();
-    
-    for (const r of reminders) {
-      if (r.status !== "pending") continue;
-      if (r.send_date !== todayStr) continue;
-      if (r.send_time !== currentTime) continue;
-
-      console.log(`📤 Sending reminder: ${r.name || r.id}`);
-      
-      try {
-        await whatsapp.sendMessage(r.target_id, r.message);
-        await sheets.updateStatus(r.id, "sent");
-        console.log(`✅ Sent: ${r.id}`);
-      } catch (err) {
-        console.error(`❌ Failed: ${r.id}`, err.message);
-        await sheets.updateStatus(r.id, "failed");
-      }
+cron.schedule(
+  "* * * * *",
+  async () => {
+    if (!whatsapp || whatsapp.getConnectionStatus() !== "connected") {
+      return;
     }
-  } catch (err) {
-    console.error("❌ Scheduler error:", err.message);
+
+    try {
+      const now = new Date();
+      const jakartaTime = new Date(
+        now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
+      );
+
+      const todayStr = jakartaTime.toISOString().split("T")[0]; // YYYY-MM-DD
+      const hours = String(jakartaTime.getHours()).padStart(2, "0");
+      const minutes = String(jakartaTime.getMinutes()).padStart(2, "0");
+      const currentTime = `${hours}:${minutes}`;
+
+      console.log(`⏰ [${todayStr} ${currentTime}] Checking reminders...`);
+
+      const reminders = await sheets.getReminders();
+
+      for (const r of reminders) {
+        if (r.status !== "pending") continue;
+        if (r.send_date !== todayStr) continue;
+        if (r.send_time !== currentTime) continue;
+
+        console.log(`📤 Sending reminder: ${r.name || r.id}`);
+
+        try {
+          await whatsapp.sendMessage(r.target_id, r.message);
+          await sheets.updateStatus(r.id, "sent");
+          console.log(`✅ Sent: ${r.id}`);
+        } catch (err) {
+          console.error(`❌ Failed: ${r.id}`, err.message);
+          await sheets.updateStatus(r.id, "failed");
+        }
+      }
+    } catch (err) {
+      console.error("❌ Scheduler error:", err.message);
+    }
+  },
+  {
+    timezone: "Asia/Jakarta",
   }
-}, {
-  timezone: "Asia/Jakarta"
-});
+);
 
 // Start server
 app.listen(PORT, "0.0.0.0", () => {

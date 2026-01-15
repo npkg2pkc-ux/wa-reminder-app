@@ -1,22 +1,23 @@
 {
   "name": "wa-reminder-app",
-  "version": "2.0.0",
-  "description": "WhatsApp Reminder - Manual Scheduler",
+  "version": "2.1.0",
+  "description": "WhatsApp Reminder with Baileys",
   "main": "index.js",
   "scripts": {
-    "start": "node --max-old-space-size=256 index.js"
+    "start": "node index.js"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc.9",
     "dotenv": "^16.6.1",
     "ejs": "^3.1.10",
     "express": "^4.22.1",
     "googleapis": "^128.0.0",
     "node-cron": "^3.0.3",
-    "qrcode": "^1.5.4",
-    "whatsapp-web.js": "^1.34.4"
+    "pino": "^10.2.0",
+    "qrcode": "^1.5.4"
   },
   "keywords": [
     "whatsapp",

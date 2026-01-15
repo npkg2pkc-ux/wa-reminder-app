@@ -1,440 +1,594 @@
 <!DOCTYPE html>
 <html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WhatsApp Reminder</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      h1 {
+        color: white;
+        text-align: center;
+        margin-bottom: 30px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      .card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+      .card h2 {
+        color: #333;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #667eea;
+        padding-bottom: 10px;
+      }
+      .status-box {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        margin-bottom: 15px;
+      }
+      .status-dot {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+      .status-dot.connected {
+        background: #25d366;
+      }
+      .status-dot.disconnected {
+        background: #dc3545;
+      }
+      .status-dot.waiting {
+        background: #ffc107;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
         }
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 {
-            color: white;
-            text-align: center;
-            margin-bottom: 30px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        50% {
+          opacity: 0.5;
         }
-        .card {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-        .card h2 {
-            color: #333;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-        .status-box {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-        .status-dot {
-            width: 15px;
-            height: 15px;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        .status-dot.connected { background: #25D366; }
-        .status-dot.disconnected { background: #dc3545; }
-        .status-dot.waiting { background: #ffc107; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .form-group { margin-bottom: 15px; }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #333;
-        }
-        .form-group input, .form-group textarea, .form-group select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        .btn {
-            padding: 12px 25px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        }
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .btn-success { background: #25D366; color: white; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-warning { background: #ffc107; color: #333; }
-        .reminder-item {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .reminder-info { flex: 1; min-width: 200px; }
-        .reminder-info h4 { color: #333; margin-bottom: 5px; }
-        .reminder-info p { color: #666; font-size: 13px; }
-        .reminder-actions { display: flex; gap: 8px; }
-        .reminder-actions .btn { padding: 8px 15px; font-size: 12px; }
-        .qr-container { text-align: center; padding: 20px; }
-        .qr-container img { max-width: 250px; border-radius: 10px; }
-        .alert {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-        }
-        .alert-success { background: #d4edda; color: #155724; }
-        .alert-error { background: #f8d7da; color: #721c24; }
-        .alert-info { background: #d1ecf1; color: #0c5460; }
-        .hidden { display: none; }
-        .group-list {
-            max-height: 200px;
-            overflow-y: auto;
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 10px;
-        }
-        .group-item {
-            padding: 10px;
-            border-bottom: 1px solid #e0e0e0;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .group-item:hover { background: #e9ecef; }
-        .group-item:last-child { border-bottom: none; }
-        .test-section {
-            background: #fff3cd;
-            border-radius: 10px;
-            padding: 15px;
-            margin-top: 15px;
-        }
-        .badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .badge-pending { background: #ffc107; color: #333; }
-        .badge-sent { background: #25D366; color: white; }
-        .badge-failed { background: #dc3545; color: white; }
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #333;
+      }
+      .form-group input,
+      .form-group textarea,
+      .form-group select {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+      }
+      .form-group input:focus,
+      .form-group textarea:focus,
+      .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+      }
+      .btn {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+      }
+      .btn-success {
+        background: #25d366;
+        color: white;
+      }
+      .btn-danger {
+        background: #dc3545;
+        color: white;
+      }
+      .btn-warning {
+        background: #ffc107;
+        color: #333;
+      }
+      .reminder-item {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .reminder-info {
+        flex: 1;
+        min-width: 200px;
+      }
+      .reminder-info h4 {
+        color: #333;
+        margin-bottom: 5px;
+      }
+      .reminder-info p {
+        color: #666;
+        font-size: 13px;
+      }
+      .reminder-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .reminder-actions .btn {
+        padding: 8px 15px;
+        font-size: 12px;
+      }
+      .qr-container {
+        text-align: center;
+        padding: 20px;
+      }
+      .qr-container img {
+        max-width: 250px;
+        border-radius: 10px;
+      }
+      .alert {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+      }
+      .alert-success {
+        background: #d4edda;
+        color: #155724;
+      }
+      .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+      }
+      .alert-info {
+        background: #d1ecf1;
+        color: #0c5460;
+      }
+      .hidden {
+        display: none;
+      }
+      .group-list {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .group-item {
+        padding: 10px;
+        border-bottom: 1px solid #e0e0e0;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .group-item:hover {
+        background: #e9ecef;
+      }
+      .group-item:last-child {
+        border-bottom: none;
+      }
+      .test-section {
+        background: #fff3cd;
+        border-radius: 10px;
+        padding: 15px;
+        margin-top: 15px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 15px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .badge-pending {
+        background: #ffc107;
+        color: #333;
+      }
+      .badge-sent {
+        background: #25d366;
+        color: white;
+      }
+      .badge-failed {
+        background: #dc3545;
+        color: white;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="container">
-        <h1>📱 WhatsApp Reminder</h1>
+      <h1>📱 WhatsApp Reminder</h1>
 
-        <!-- Status WhatsApp -->
-        <div class="card">
-            <h2>🔗 Status Koneksi</h2>
-            <div class="status-box">
-                <div class="status-dot <%= status === 'connected' ? 'connected' : (status === 'waiting_qr' ? 'waiting' : 'disconnected') %>"></div>
-                <div>
-                    <strong>Status:</strong> 
-                    <% if (status === 'connected') { %>
-                        <span style="color: #25D366;">Terhubung ✓</span>
-                    <% } else if (status === 'waiting_qr') { %>
-                        <span style="color: #ffc107;">Menunggu Scan QR...</span>
-                    <% } else { %>
-                        <span style="color: #dc3545;">Tidak Terhubung</span>
-                    <% } %>
-                </div>
-            </div>
-            
-            <% if (status !== 'connected') { %>
-            <div class="qr-container">
-                <p style="margin-bottom: 15px; color: #666;">Scan QR Code dengan WhatsApp:</p>
-                <% if (qrCode) { %>
-                    <img src="<%= qrCode %>" alt="QR Code">
-                    <p style="margin-top: 10px; font-size: 12px; color: #999;">Halaman refresh otomatis setiap 10 detik</p>
-                <% } else { %>
-                    <p>Memuat QR Code...</p>
-                    <button class="btn btn-primary" onclick="location.reload()">🔄 Muat Ulang</button>
-                <% } %>
-            </div>
+      <!-- Status WhatsApp -->
+      <div class="card">
+        <h2>🔗 Status Koneksi</h2>
+        <div class="status-box">
+          <div
+            class="status-dot <%= status === 'connected' ? 'connected' : (status === 'waiting_qr' ? 'waiting' : 'disconnected') %>"
+          ></div>
+          <div>
+            <strong>Status:</strong>
+            <% if (status === 'connected') { %>
+            <span style="color: #25d366">Terhubung ✓</span>
+            <% } else if (status === 'waiting_qr') { %>
+            <span style="color: #ffc107">Menunggu Scan QR...</span>
             <% } else { %>
-            <button class="btn btn-success" onclick="loadGroups()">📋 Lihat Daftar Grup</button>
-            <div id="groupList" class="group-list hidden" style="margin-top: 15px;"></div>
+            <span style="color: #dc3545">Tidak Terhubung</span>
             <% } %>
+          </div>
         </div>
 
-        <!-- Form Tambah Reminder -->
-        <div class="card">
-            <h2>➕ Tambah Reminder Manual</h2>
-            
-            <div id="alertBox"></div>
+        <% if (status !== 'connected') { %>
+        <div class="qr-container">
+          <p style="margin-bottom: 15px; color: #666">
+            Scan QR Code dengan WhatsApp:
+          </p>
+          <% if (qrCode) { %>
+          <img src="<%= qrCode %>" alt="QR Code" />
+          <p style="margin-top: 10px; font-size: 12px; color: #999">
+            Halaman refresh otomatis setiap 10 detik
+          </p>
+          <% } else { %>
+          <p>Memuat QR Code...</p>
+          <button class="btn btn-primary" onclick="location.reload()">
+            🔄 Muat Ulang
+          </button>
+          <% } %>
+        </div>
+        <% } else { %>
+        <button class="btn btn-success" onclick="loadGroups()">
+          📋 Lihat Daftar Grup
+        </button>
+        <div
+          id="groupList"
+          class="group-list hidden"
+          style="margin-top: 15px"
+        ></div>
+        <% } %>
+      </div>
 
-            <form id="reminderForm">
-                <div class="form-group">
-                    <label>Nama Reminder</label>
-                    <input type="text" id="reminderName" placeholder="Contoh: Reminder Meeting" required>
-                </div>
+      <!-- Form Tambah Reminder -->
+      <div class="card">
+        <h2>➕ Tambah Reminder Manual</h2>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>📅 Tanggal Kirim</label>
-                        <input type="date" id="sendDate" required>
-                    </div>
-                    <div class="form-group">
-                        <label>⏰ Jam Kirim (WIB)</label>
-                        <input type="time" id="sendTime" value="08:00" required>
-                    </div>
-                </div>
+        <div id="alertBox"></div>
 
-                <div class="form-group">
-                    <label>📱 Group ID / Nomor WA</label>
-                    <input type="text" id="targetId" placeholder="Klik 'Lihat Daftar Grup' atau isi manual" required>
-                    <small style="color: #666;">Format nomor: 628xxx@c.us | Klik "Lihat Daftar Grup" di atas untuk copy ID grup</small>
-                </div>
+        <form id="reminderForm">
+          <div class="form-group">
+            <label>Nama Reminder</label>
+            <input
+              type="text"
+              id="reminderName"
+              placeholder="Contoh: Reminder Meeting"
+              required
+            />
+          </div>
 
-                <div class="form-group">
-                    <label>💬 Pesan</label>
-                    <textarea id="messageText" rows="4" placeholder="Tulis pesan reminder di sini..." required></textarea>
-                </div>
-
-                <button type="submit" class="btn btn-primary" id="addBtn">➕ Tambah Reminder</button>
-            </form>
-
-            <!-- Test Kirim Langsung -->
-            <div class="test-section">
-                <h4>🧪 Test Kirim Sekarang</h4>
-                <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Kirim pesan langsung untuk test koneksi</p>
-                <button type="button" class="btn btn-success" onclick="testSend()">📤 Kirim Test Sekarang</button>
+          <div class="form-row">
+            <div class="form-group">
+              <label>📅 Tanggal Kirim</label>
+              <input type="date" id="sendDate" required />
             </div>
-        </div>
-
-        <!-- Daftar Reminder -->
-        <div class="card">
-            <h2>📋 Daftar Reminder</h2>
-            <button class="btn btn-primary" onclick="location.reload()" style="margin-bottom: 15px;">🔄 Refresh</button>
-            
-            <div class="reminder-list" id="reminderList">
-                <% if (reminders && reminders.length > 0) { %>
-                    <% reminders.forEach(function(r) { %>
-                    <div class="reminder-item" id="reminder-<%= r.id %>">
-                        <div class="reminder-info">
-                            <h4><%= r.name || r.id %></h4>
-                            <p>📅 <strong><%= r.send_date %></strong> | ⏰ <strong><%= r.send_time %></strong></p>
-                            <p>📱 <%= r.target_id %></p>
-                            <p>💬 <%= r.message ? (r.message.length > 80 ? r.message.substring(0, 80) + '...' : r.message) : '-' %></p>
-                            <p>Status: 
-                                <span class="badge badge-<%= r.status || 'pending' %>">
-                                    <%= r.status === 'sent' ? '✓ Terkirim' : (r.status === 'failed' ? '✗ Gagal' : '⏳ Menunggu') %>
-                                </span>
-                            </p>
-                        </div>
-                        <div class="reminder-actions">
-                            <% if (r.status !== 'sent') { %>
-                            <button type="button" class="btn btn-success" onclick="sendNow('<%= r.id %>')">📤 Kirim</button>
-                            <% } %>
-                            <button type="button" class="btn btn-danger" onclick="deleteReminder('<%= r.id %>')">🗑️ Hapus</button>
-                        </div>
-                    </div>
-                    <% }); %>
-                <% } else { %>
-                    <p style="color: #666; text-align: center; padding: 20px;">Belum ada reminder. Tambah reminder baru di atas.</p>
-                <% } %>
+            <div class="form-group">
+              <label>⏰ Jam Kirim (WIB)</label>
+              <input type="time" id="sendTime" value="08:00" required />
             </div>
-        </div>
+          </div>
 
-        <!-- Info -->
-        <div class="card">
-            <h2>ℹ️ Informasi</h2>
-            <p>• Sistem akan otomatis mengirim reminder pada tanggal dan jam yang ditentukan</p>
-            <p>• Pastikan WhatsApp tetap terhubung (scan QR code jika perlu)</p>
-            <p>• Gunakan "Test Kirim Sekarang" untuk memastikan koneksi berfungsi</p>
-            <p>• Waktu server: <strong><%= new Date().toLocaleString('id-ID', {timeZone: 'Asia/Jakarta'}) %> WIB</strong></p>
+          <div class="form-group">
+            <label>📱 Group ID / Nomor WA</label>
+            <input
+              type="text"
+              id="targetId"
+              placeholder="Klik 'Lihat Daftar Grup' atau isi manual"
+              required
+            />
+            <small style="color: #666"
+              >Format nomor: 628xxx@c.us | Klik "Lihat Daftar Grup" di atas
+              untuk copy ID grup</small
+            >
+          </div>
+
+          <div class="form-group">
+            <label>💬 Pesan</label>
+            <textarea
+              id="messageText"
+              rows="4"
+              placeholder="Tulis pesan reminder di sini..."
+              required
+            ></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="addBtn">
+            ➕ Tambah Reminder
+          </button>
+        </form>
+
+        <!-- Test Kirim Langsung -->
+        <div class="test-section">
+          <h4>🧪 Test Kirim Sekarang</h4>
+          <p style="font-size: 13px; color: #666; margin-bottom: 10px">
+            Kirim pesan langsung untuk test koneksi
+          </p>
+          <button type="button" class="btn btn-success" onclick="testSend()">
+            📤 Kirim Test Sekarang
+          </button>
         </div>
+      </div>
+
+      <!-- Daftar Reminder -->
+      <div class="card">
+        <h2>📋 Daftar Reminder</h2>
+        <button
+          class="btn btn-primary"
+          onclick="location.reload()"
+          style="margin-bottom: 15px"
+        >
+          🔄 Refresh
+        </button>
+
+        <div class="reminder-list" id="reminderList">
+          <% if (reminders && reminders.length > 0) { %> <%
+          reminders.forEach(function(r) { %>
+          <div class="reminder-item" id="reminder-<%= r.id %>">
+            <div class="reminder-info">
+              <h4><%= r.name || r.id %></h4>
+              <p>
+                📅 <strong><%= r.send_date %></strong> | ⏰
+                <strong><%= r.send_time %></strong>
+              </p>
+              <p>📱 <%= r.target_id %></p>
+              <p>
+                💬 <%= r.message ? (r.message.length > 80 ?
+                r.message.substring(0, 80) + '...' : r.message) : '-' %>
+              </p>
+              <p>
+                Status:
+                <span class="badge badge-<%= r.status || 'pending' %>">
+                  <%= r.status === 'sent' ? '✓ Terkirim' : (r.status ===
+                  'failed' ? '✗ Gagal' : '⏳ Menunggu') %>
+                </span>
+              </p>
+            </div>
+            <div class="reminder-actions">
+              <% if (r.status !== 'sent') { %>
+              <button
+                type="button"
+                class="btn btn-success"
+                onclick="sendNow('<%= r.id %>')"
+              >
+                📤 Kirim
+              </button>
+              <% } %>
+              <button
+                type="button"
+                class="btn btn-danger"
+                onclick="deleteReminder('<%= r.id %>')"
+              >
+                🗑️ Hapus
+              </button>
+            </div>
+          </div>
+          <% }); %> <% } else { %>
+          <p style="color: #666; text-align: center; padding: 20px">
+            Belum ada reminder. Tambah reminder baru di atas.
+          </p>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Info -->
+      <div class="card">
+        <h2>ℹ️ Informasi</h2>
+        <p>
+          • Sistem akan otomatis mengirim reminder pada tanggal dan jam yang
+          ditentukan
+        </p>
+        <p>• Pastikan WhatsApp tetap terhubung (scan QR code jika perlu)</p>
+        <p>
+          • Gunakan "Test Kirim Sekarang" untuk memastikan koneksi berfungsi
+        </p>
+        <p>
+          • Waktu server:
+          <strong
+            ><%= new Date().toLocaleString('id-ID', {timeZone: 'Asia/Jakarta'})
+            %> WIB</strong
+          >
+        </p>
+      </div>
     </div>
 
     <script>
-        // Set default date to today
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        document.getElementById('sendDate').value = yyyy + '-' + mm + '-' + dd;
+      // Set default date to today
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      document.getElementById('sendDate').value = yyyy + '-' + mm + '-' + dd;
 
-        function showAlert(message, type) {
-            const alertBox = document.getElementById('alertBox');
-            alertBox.innerHTML = '<div class="alert alert-' + type + '">' + message + '</div>';
-            setTimeout(function() { alertBox.innerHTML = ''; }, 5000);
-        }
+      function showAlert(message, type) {
+          const alertBox = document.getElementById('alertBox');
+          alertBox.innerHTML = '<div class="alert alert-' + type + '">' + message + '</div>';
+          setTimeout(function() { alertBox.innerHTML = ''; }, 5000);
+      }
 
-        document.getElementById('reminderForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('addBtn');
-            btn.disabled = true;
-            btn.textContent = '⏳ Menyimpan...';
+      document.getElementById('reminderForm').addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const btn = document.getElementById('addBtn');
+          btn.disabled = true;
+          btn.textContent = '⏳ Menyimpan...';
 
-            const data = {
-                name: document.getElementById('reminderName').value,
-                send_date: document.getElementById('sendDate').value,
-                send_time: document.getElementById('sendTime').value,
-                target_id: document.getElementById('targetId').value,
-                message: document.getElementById('messageText').value
-            };
+          const data = {
+              name: document.getElementById('reminderName').value,
+              send_date: document.getElementById('sendDate').value,
+              send_time: document.getElementById('sendTime').value,
+              target_id: document.getElementById('targetId').value,
+              message: document.getElementById('messageText').value
+          };
 
-            try {
-                const res = await fetch('/api/reminders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await res.json();
-                
-                if (result.success) {
-                    showAlert('✅ Reminder berhasil ditambahkan!', 'success');
-                    setTimeout(function() { location.reload(); }, 1000);
-                } else {
-                    showAlert('❌ Gagal: ' + result.error, 'error');
-                }
-            } catch (err) {
-                showAlert('❌ Error: ' + err.message, 'error');
-            }
+          try {
+              const res = await fetch('/api/reminders', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(data)
+              });
+              const result = await res.json();
 
-            btn.disabled = false;
-            btn.textContent = '➕ Tambah Reminder';
-        });
+              if (result.success) {
+                  showAlert('✅ Reminder berhasil ditambahkan!', 'success');
+                  setTimeout(function() { location.reload(); }, 1000);
+              } else {
+                  showAlert('❌ Gagal: ' + result.error, 'error');
+              }
+          } catch (err) {
+              showAlert('❌ Error: ' + err.message, 'error');
+          }
 
-        async function deleteReminder(id) {
-            if (!confirm('Yakin ingin menghapus reminder ini?')) return;
-            
-            try {
-                const res = await fetch('/api/reminders/' + id, { method: 'DELETE' });
-                const result = await res.json();
-                
-                if (result.success) {
-                    document.getElementById('reminder-' + id).remove();
-                    showAlert('✅ Reminder berhasil dihapus!', 'success');
-                } else {
-                    showAlert('❌ Gagal: ' + result.error, 'error');
-                }
-            } catch (err) {
-                showAlert('❌ Error: ' + err.message, 'error');
-            }
-        }
+          btn.disabled = false;
+          btn.textContent = '➕ Tambah Reminder';
+      });
 
-        async function sendNow(id) {
-            if (!confirm('Kirim reminder ini sekarang?')) return;
-            
-            try {
-                const res = await fetch('/api/reminders/' + id + '/send', { method: 'POST' });
-                const result = await res.json();
-                
-                if (result.success) {
-                    showAlert('✅ Pesan berhasil dikirim!', 'success');
-                    setTimeout(function() { location.reload(); }, 1000);
-                } else {
-                    showAlert('❌ Gagal: ' + result.error, 'error');
-                }
-            } catch (err) {
-                showAlert('❌ Error: ' + err.message, 'error');
-            }
-        }
+      async function deleteReminder(id) {
+          if (!confirm('Yakin ingin menghapus reminder ini?')) return;
 
-        async function testSend() {
-            const targetId = document.getElementById('targetId').value;
-            const message = document.getElementById('messageText').value || '🧪 Test pesan dari WhatsApp Reminder';
-            
-            if (!targetId) {
-                showAlert('⚠️ Isi Group ID / Nomor WA terlebih dahulu', 'error');
-                return;
-            }
-            
-            if (!confirm('Kirim pesan test ke ' + targetId + '?')) return;
-            
-            try {
-                const res = await fetch('/api/test-send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ targetId: targetId, message: message })
-                });
-                const result = await res.json();
-                
-                if (result.success) {
-                    showAlert('✅ Pesan test berhasil dikirim!', 'success');
-                } else {
-                    showAlert('❌ Gagal: ' + result.error, 'error');
-                }
-            } catch (err) {
-                showAlert('❌ Error: ' + err.message, 'error');
-            }
-        }
+          try {
+              const res = await fetch('/api/reminders/' + id, { method: 'DELETE' });
+              const result = await res.json();
 
-        async function loadGroups() {
-            const listDiv = document.getElementById('groupList');
-            listDiv.classList.remove('hidden');
-            listDiv.innerHTML = '<p>⏳ Memuat daftar grup...</p>';
-            
-            try {
-                const res = await fetch('/api/groups');
-                const result = await res.json();
-                
-                if (result.success && result.groups) {
-                    let html = '';
-                    result.groups.forEach(function(g) {
-                        html += '<div class="group-item" onclick="document.getElementById(\'targetId\').value=\'' + g.id + '\'">' +
-                            '<strong>' + g.name + '</strong><br>' +
-                            '<small style="color: #666;">' + g.id + '</small>' +
-                            '</div>';
-                    });
-                    listDiv.innerHTML = html;
-                } else {
-                    listDiv.innerHTML = '<p>❌ Gagal memuat: ' + (result.error || 'Unknown error') + '</p>';
-                }
-            } catch (err) {
-                listDiv.innerHTML = '<p>❌ Error: ' + err.message + '</p>';
-            }
-        }
+              if (result.success) {
+                  document.getElementById('reminder-' + id).remove();
+                  showAlert('✅ Reminder berhasil dihapus!', 'success');
+              } else {
+                  showAlert('❌ Gagal: ' + result.error, 'error');
+              }
+          } catch (err) {
+              showAlert('❌ Error: ' + err.message, 'error');
+          }
+      }
 
-        // Auto refresh if not connected
-        <% if (status !== 'connected') { %>
-        setTimeout(function() { location.reload(); }, 10000);
-        <% } %>
+      async function sendNow(id) {
+          if (!confirm('Kirim reminder ini sekarang?')) return;
+
+          try {
+              const res = await fetch('/api/reminders/' + id + '/send', { method: 'POST' });
+              const result = await res.json();
+
+              if (result.success) {
+                  showAlert('✅ Pesan berhasil dikirim!', 'success');
+                  setTimeout(function() { location.reload(); }, 1000);
+              } else {
+                  showAlert('❌ Gagal: ' + result.error, 'error');
+              }
+          } catch (err) {
+              showAlert('❌ Error: ' + err.message, 'error');
+          }
+      }
+
+      async function testSend() {
+          const targetId = document.getElementById('targetId').value;
+          const message = document.getElementById('messageText').value || '🧪 Test pesan dari WhatsApp Reminder';
+
+          if (!targetId) {
+              showAlert('⚠️ Isi Group ID / Nomor WA terlebih dahulu', 'error');
+              return;
+          }
+
+          if (!confirm('Kirim pesan test ke ' + targetId + '?')) return;
+
+          try {
+              const res = await fetch('/api/test-send', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ targetId: targetId, message: message })
+              });
+              const result = await res.json();
+
+              if (result.success) {
+                  showAlert('✅ Pesan test berhasil dikirim!', 'success');
+              } else {
+                  showAlert('❌ Gagal: ' + result.error, 'error');
+              }
+          } catch (err) {
+              showAlert('❌ Error: ' + err.message, 'error');
+          }
+      }
+
+      async function loadGroups() {
+          const listDiv = document.getElementById('groupList');
+          listDiv.classList.remove('hidden');
+          listDiv.innerHTML = '<p>⏳ Memuat daftar grup...</p>';
+
+          try {
+              const res = await fetch('/api/groups');
+              const result = await res.json();
+
+              if (result.success && result.groups) {
+                  let html = '';
+                  result.groups.forEach(function(g) {
+                      html += '<div class="group-item" onclick="document.getElementById(\'targetId\').value=\'' + g.id + '\'">' +
+                          '<strong>' + g.name + '</strong><br>' +
+                          '<small style="color: #666;">' + g.id + '</small>' +
+                          '</div>';
+                  });
+                  listDiv.innerHTML = html;
+              } else {
+                  listDiv.innerHTML = '<p>❌ Gagal memuat: ' + (result.error || 'Unknown error') + '</p>';
+              }
+          } catch (err) {
+              listDiv.innerHTML = '<p>❌ Error: ' + err.message + '</p>';
+          }
+      }
+
+      // Auto refresh if not connected
+      <% if (status !== 'connected') { %>
+      setTimeout(function() { location.reload(); }, 10000);
+      <% } %>
     </script>
-</body>
+  </body>
 </html>

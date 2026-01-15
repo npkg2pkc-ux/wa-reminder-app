@@ -10,8 +10,11 @@ let sheets = null;
 // Initialize Google Sheets
 function initSheets() {
   if (sheets) return true;
-  
-  const privateKey = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, "\n");
+
+  const privateKey = (process.env.GOOGLE_PRIVATE_KEY || "").replace(
+    /\\n/g,
+    "\n"
+  );
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
 
   if (!privateKey || !clientEmail || !SHEET_ID) {
@@ -33,7 +36,7 @@ function initSheets() {
 
 // Generate simple ID
 function generateId() {
-  return 'R' + Date.now().toString(36).toUpperCase();
+  return "R" + Date.now().toString(36).toUpperCase();
 }
 
 // Initialize sheet with headers
@@ -52,7 +55,17 @@ async function initializeSheet() {
         range: `${SHEET_NAME}!A1:G1`,
         valueInputOption: "RAW",
         resource: {
-          values: [["id", "name", "send_date", "send_time", "target_id", "message", "status"]],
+          values: [
+            [
+              "id",
+              "name",
+              "send_date",
+              "send_time",
+              "target_id",
+              "message",
+              "status",
+            ],
+          ],
         },
       });
       console.log("📊 Sheet initialized with headers");
@@ -76,7 +89,7 @@ async function initializeSheet() {
 // Get all reminders
 async function getReminders() {
   if (!initSheets()) return [];
-  
+
   try {
     const res = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
@@ -86,15 +99,18 @@ async function getReminders() {
     const rows = res.data.values || [];
     if (rows.length <= 1) return [];
 
-    return rows.slice(1).map(row => ({
-      id: row[0] || '',
-      name: row[1] || '',
-      send_date: row[2] || '',
-      send_time: row[3] || '',
-      target_id: row[4] || '',
-      message: row[5] || '',
-      status: row[6] || 'pending',
-    })).filter(r => r.id);
+    return rows
+      .slice(1)
+      .map((row) => ({
+        id: row[0] || "",
+        name: row[1] || "",
+        send_date: row[2] || "",
+        send_time: row[3] || "",
+        target_id: row[4] || "",
+        message: row[5] || "",
+        status: row[6] || "pending",
+      }))
+      .filter((r) => r.id);
   } catch (error) {
     console.error("❌ Error getting reminders:", error.message);
     return [];
@@ -108,12 +124,12 @@ async function addReminder(data) {
   const id = generateId();
   const row = [
     id,
-    data.name || '',
-    data.send_date || '',
-    data.send_time || '',
-    data.target_id || '',
-    data.message || '',
-    'pending'
+    data.name || "",
+    data.send_date || "",
+    data.send_time || "",
+    data.target_id || "",
+    data.message || "",
+    "pending",
   ];
 
   await sheets.spreadsheets.values.append({
@@ -137,7 +153,7 @@ async function deleteReminder(id) {
   });
 
   const rows = res.data.values || [];
-  const rowIndex = rows.findIndex(row => row[0] === id);
+  const rowIndex = rows.findIndex((row) => row[0] === id);
 
   if (rowIndex === -1) {
     throw new Error("Reminder not found");
@@ -147,23 +163,27 @@ async function deleteReminder(id) {
   const sheetInfo = await sheets.spreadsheets.get({
     spreadsheetId: SHEET_ID,
   });
-  const sheet = sheetInfo.data.sheets.find(s => s.properties.title === SHEET_NAME);
+  const sheet = sheetInfo.data.sheets.find(
+    (s) => s.properties.title === SHEET_NAME
+  );
   const sheetId = sheet.properties.sheetId;
 
   // Delete row
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: SHEET_ID,
     resource: {
-      requests: [{
-        deleteDimension: {
-          range: {
-            sheetId: sheetId,
-            dimension: "ROWS",
-            startIndex: rowIndex,
-            endIndex: rowIndex + 1,
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: sheetId,
+              dimension: "ROWS",
+              startIndex: rowIndex,
+              endIndex: rowIndex + 1,
+            },
           },
         },
-      }],
+      ],
     },
   });
 
@@ -181,7 +201,7 @@ async function updateStatus(id, status) {
   });
 
   const rows = res.data.values || [];
-  const rowIndex = rows.findIndex(row => row[0] === id);
+  const rowIndex = rows.findIndex((row) => row[0] === id);
 
   if (rowIndex === -1) {
     throw new Error("Reminder not found");
@@ -201,7 +221,7 @@ async function updateStatus(id, status) {
 // Get reminder by ID
 async function getReminder(id) {
   const reminders = await getReminders();
-  return reminders.find(r => r.id === id);
+  return reminders.find((r) => r.id === id);
 }
 
 module.exports = {
