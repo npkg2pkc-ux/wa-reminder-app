@@ -139,6 +139,32 @@ function getConnectionStatus() {
   return connectionStatus;
 }
 
+/**
+ * Get all WhatsApp groups
+ * @returns {Promise<Array>} - Array of group objects with name and id
+ */
+async function getGroups() {
+  try {
+    const state = await client.getState();
+    if (state !== "CONNECTED") {
+      throw new Error("WhatsApp client is not connected");
+    }
+
+    const chats = await client.getChats();
+    const groups = chats
+      .filter((chat) => chat.isGroup)
+      .map((group) => ({
+        name: group.name,
+        id: group.id._serialized,
+      }));
+
+    return groups;
+  } catch (error) {
+    console.error("❌ Error getting groups:", error.message);
+    throw error;
+  }
+}
+
 module.exports = {
   client,
   initializeClient,
@@ -146,4 +172,5 @@ module.exports = {
   getClient,
   getQRCode,
   getConnectionStatus,
+  getGroups,
 };

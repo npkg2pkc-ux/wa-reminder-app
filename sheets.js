@@ -190,7 +190,7 @@ function ensureAuth() {
  */
 async function getAutoReminders() {
   ensureAuth();
-  
+
   try {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
@@ -243,7 +243,7 @@ async function getEnabledAutoReminders() {
  */
 async function addAutoReminder(data) {
   ensureAuth();
-  
+
   try {
     const { id, message, group_id, trigger_time, type, rule } = data;
     const last_sent = "";
@@ -286,7 +286,7 @@ async function addAutoReminder(data) {
  */
 async function updateLastSent(id, date) {
   ensureAuth();
-  
+
   try {
     // First, get all reminders to find the row index
     const reminders = await getAutoReminders();
@@ -323,7 +323,7 @@ async function updateLastSent(id, date) {
  */
 async function updateReminderEnabled(id, enabled) {
   ensureAuth();
-  
+
   try {
     console.log(`🔄 Updating reminder ${id} enabled status to: ${enabled}`);
 
@@ -383,7 +383,7 @@ let isDeleting = false;
  */
 async function deleteAutoReminder(id) {
   ensureAuth();
-  
+
   // Prevent concurrent deletes which can cause row index issues
   if (isDeleting) {
     console.log(`⏳ Delete operation in progress, waiting...`);

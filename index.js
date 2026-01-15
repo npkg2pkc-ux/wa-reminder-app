@@ -96,6 +96,132 @@ app.get("/qr", (req, res) => {
   }
 });
 
+// Groups endpoint - shows list of WhatsApp groups with their IDs
+app.get("/groups", async (req, res) => {
+  try {
+    const whatsapp = require("./whatsapp");
+    const status = whatsapp.getConnectionStatus();
+
+    if (status !== "connected") {
+      return res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>WhatsApp Groups</title>
+          <meta http-equiv="refresh" content="5">
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; background: #f0f2f5; }
+            .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+            h1 { color: #128C7E; }
+            .warning { background: #FFA500; color: white; padding: 15px; border-radius: 5px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>📋 WhatsApp Groups</h1>
+            <div class="warning">
+              ⚠️ WhatsApp is not connected yet. Status: ${status.toUpperCase()}
+              <br><br>
+              Please go to <a href="/qr">/qr</a> to scan QR code first.
+            </div>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    const groups = await whatsapp.getGroups();
+
+    let groupsHtml = groups.map(g => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">${g.name}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 12px;">${g.id}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #eee;">
+          <button onclick="navigator.clipboard.writeText('${g.id}'); alert('Copied!');" style="padding: 5px 10px; cursor: pointer;">📋 Copy</button>
+        </td>
+      </tr>
+    `).join('');
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>WhatsApp Groups</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 40px; background: #f0f2f5; }
+          .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+          h1 { color: #128C7E; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th { background: #128C7E; color: white; padding: 12px; text-align: left; }
+          .success { background: #25D366; color: white; padding: 10px 20px; border-radius: 5px; display: inline-block; margin-bottom: 20px; }
+          a { color: #128C7E; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>📋 WhatsApp Groups</h1>
+          <div class="success">✅ WhatsApp Connected - Found ${groups.length} groups</div>
+          <p><a href="/">← Back to Dashboard</a></p>
+          <table>
+            <thead>
+              <tr>
+                <th>Group Name</th>
+                <th>Group ID (use this in reminder)</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${groupsHtml}
+            </tbody>
+          </table>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Error</title></head>
+      <body>
+        <h1>Error</h1>
+        <p>${error.message}</p>
+        <p><a href="/qr">Go to QR page</a></p>
+      </body>
+      </html>
+    `);
+  }
+});
+
+// Test send message endpoint
+app.post("/test-send", async (req, res) => {
+  try {
+    const whatsapp = require("./whatsapp");
+    const { group_id, message } = req.body;
+
+    if (!group_id || !message) {
+      return res.status(400).json({ error: "group_id and message are required" });
+    }
+
+    await whatsapp.sendMessageToGroup(group_id, message);
+    res.json({ success: true, message: "Message sent successfully!" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Manual trigger reminder endpoint
+app.get("/trigger-reminder", async (req, res) => {
+  try {
+    const scheduler = require("./scheduler");
+    console.log("🔄 Manually triggering reminder check...");
+    await scheduler.processAutoReminders();
+    res.json({ success: true, message: "Reminder check triggered! Check logs for details." });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
