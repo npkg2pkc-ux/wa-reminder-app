@@ -155,12 +155,14 @@
               </div>
               <div class="reminder-actions">
                 <button
+                  type="button"
                   class="btn-toggle <%= reminder.enabled ? 'btn-pause' : 'btn-enable' %>"
                   onclick="toggleReminder('<%= reminder.id %>', <%= reminder.enabled ? 'false' : 'true' %>)"
                 >
                   <%= reminder.enabled ? '⏸️ Pause' : '▶️ Enable' %>
                 </button>
                 <button
+                  type="button"
                   class="btn-delete"
                   onclick="deleteReminder('<%= reminder.id %>')"
                 >
