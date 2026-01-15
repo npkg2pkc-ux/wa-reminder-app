@@ -145,9 +145,21 @@ function getConnectionStatus() {
  */
 async function getGroups() {
   try {
-    const state = await client.getState();
+    // Check connection status first
+    if (connectionStatus !== "connected") {
+      throw new Error(`WhatsApp status is: ${connectionStatus}`);
+    }
+
+    // Try to get state
+    let state;
+    try {
+      state = await client.getState();
+    } catch (stateError) {
+      throw new Error(`Cannot get client state: ${stateError.message}`);
+    }
+
     if (state !== "CONNECTED") {
-      throw new Error("WhatsApp client is not connected");
+      throw new Error(`WhatsApp state is: ${state}`);
     }
 
     const chats = await client.getChats();
@@ -158,6 +170,7 @@ async function getGroups() {
         id: group.id._serialized,
       }));
 
+    console.log(`📋 Found ${groups.length} WhatsApp groups`);
     return groups;
   } catch (error) {
     console.error("❌ Error getting groups:", error.message);

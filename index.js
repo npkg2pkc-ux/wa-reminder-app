@@ -100,9 +100,22 @@ app.get("/qr", (req, res) => {
 app.get("/groups", async (req, res) => {
   try {
     const whatsapp = require("./whatsapp");
-    const status = whatsapp.getConnectionStatus();
+    
+    // Try to get groups directly - this will check actual connection state
+    let groups = [];
+    let isConnected = false;
+    let errorMsg = "";
+    
+    try {
+      groups = await whatsapp.getGroups();
+      isConnected = true;
+    } catch (err) {
+      errorMsg = err.message;
+      isConnected = false;
+    }
 
-    if (status !== "connected") {
+    if (!isConnected) {
+      const status = whatsapp.getConnectionStatus();
       return res.send(`
         <!DOCTYPE html>
         <html>
@@ -121,6 +134,7 @@ app.get("/groups", async (req, res) => {
             <h1>📋 WhatsApp Groups</h1>
             <div class="warning">
               ⚠️ WhatsApp is not connected yet. Status: ${status.toUpperCase()}
+              <br>Error: ${errorMsg}
               <br><br>
               Please go to <a href="/qr">/qr</a> to scan QR code first.
             </div>
@@ -130,9 +144,9 @@ app.get("/groups", async (req, res) => {
       `);
     }
 
-    const groups = await whatsapp.getGroups();
-
-    let groupsHtml = groups.map(g => `
+    let groupsHtml = groups
+      .map(
+        (g) => `
       <tr>
         <td style="padding: 10px; border-bottom: 1px solid #eee;">${g.name}</td>
         <td style="padding: 10px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 12px;">${g.id}</td>
@@ -140,7 +154,9 @@ app.get("/groups", async (req, res) => {
           <button onclick="navigator.clipboard.writeText('${g.id}'); alert('Copied!');" style="padding: 5px 10px; cursor: pointer;">📋 Copy</button>
         </td>
       </tr>
-    `).join('');
+    `
+      )
+      .join("");
 
     res.send(`
       <!DOCTYPE html>
@@ -200,7 +216,9 @@ app.post("/test-send", async (req, res) => {
     const { group_id, message } = req.body;
 
     if (!group_id || !message) {
-      return res.status(400).json({ error: "group_id and message are required" });
+      return res
+        .status(400)
+        .json({ error: "group_id and message are required" });
     }
 
     await whatsapp.sendMessageToGroup(group_id, message);
@@ -216,7 +234,10 @@ app.get("/trigger-reminder", async (req, res) => {
     const scheduler = require("./scheduler");
     console.log("🔄 Manually triggering reminder check...");
     await scheduler.processAutoReminders();
-    res.json({ success: true, message: "Reminder check triggered! Check logs for details." });
+    res.json({
+      success: true,
+      message: "Reminder check triggered! Check logs for details.",
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
