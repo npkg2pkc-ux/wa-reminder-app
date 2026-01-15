@@ -265,21 +265,16 @@
         </div>
 
         <% if (status !== 'connected') { %>
-        <div class="qr-container">
+        <div class="qr-container" id="qrContainer">
           <p style="margin-bottom: 15px; color: #666">
             Scan QR Code dengan WhatsApp:
           </p>
-          <% if (qrCode) { %>
-          <img src="<%= qrCode %>" alt="QR Code" />
+          <div id="qrDisplay">
+            <p>⏳ Memuat QR Code...</p>
+          </div>
           <p style="margin-top: 10px; font-size: 12px; color: #999">
-            Halaman refresh otomatis setiap 10 detik
+            QR Code refresh otomatis setiap 3 detik
           </p>
-          <% } else { %>
-          <p>Memuat QR Code...</p>
-          <button class="btn btn-primary" onclick="location.reload()">
-            🔄 Muat Ulang
-          </button>
-          <% } %>
         </div>
         <% } else { %>
         <button class="btn btn-success" onclick="loadGroups()">
@@ -585,9 +580,33 @@
           }
       }
 
-      // Auto refresh if not connected
+      // Auto refresh QR if not connected
       <% if (status !== 'connected') { %>
-      setTimeout(function() { location.reload(); }, 10000);
+      async function refreshQR() {
+          try {
+              const res = await fetch('/api/qr');
+              const data = await res.json();
+              
+              if (data.status === 'connected') {
+                  // Connected! Reload page
+                  location.reload();
+                  return;
+              }
+              
+              const qrDisplay = document.getElementById('qrDisplay');
+              if (data.qrCode) {
+                  qrDisplay.innerHTML = '<img src="' + data.qrCode + '" alt="QR Code" style="max-width: 250px; border-radius: 10px;">';
+              } else {
+                  qrDisplay.innerHTML = '<p>⏳ Menunggu QR Code dari server...</p><p style="font-size: 12px; color: #999;">Status: ' + data.status + '</p>';
+              }
+          } catch (err) {
+              console.error('QR refresh error:', err);
+          }
+      }
+      
+      // Refresh QR every 3 seconds
+      refreshQR();
+      setInterval(refreshQR, 3000);
       <% } %>
     </script>
   </body>

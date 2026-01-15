@@ -66,11 +66,23 @@ app.get("/", async (req, res) => {
   }
 });
 
+// API: Get QR code
+app.get("/api/qr", (req, res) => {
+  try {
+    const status = whatsapp ? whatsapp.getConnectionStatus() : "disconnected";
+    const qrCode = whatsapp ? whatsapp.getQRCode() : null;
+    res.json({ success: true, status, qrCode });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
+});
+
 // API: Get groups
 app.get("/api/groups", async (req, res) => {
   try {
-    if (!whatsapp || whatsapp.getConnectionStatus() !== "connected") {
-      return res.json({ success: false, error: "WhatsApp tidak terhubung" });
+    const status = whatsapp ? whatsapp.getConnectionStatus() : "disconnected";
+    if (status !== "connected") {
+      return res.json({ success: false, error: "WhatsApp tidak terhubung. Status: " + status });
     }
     const groups = await whatsapp.getGroups();
     res.json({ success: true, groups });
