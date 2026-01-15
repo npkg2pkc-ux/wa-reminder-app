@@ -240,7 +240,9 @@
             location.reload();
           } else {
             const data = await response.json();
-            alert("Failed to delete reminder: " + (data.error || "Unknown error"));
+            alert(
+              "Failed to delete reminder: " + (data.error || "Unknown error")
+            );
             isProcessing = false;
           }
         } catch (error) {
@@ -250,15 +252,18 @@
       }
 
       // Prevent form double-submit
-      document.querySelector('.reminder-form').addEventListener('submit', function(e) {
-        if (isProcessing) {
-          e.preventDefault();
-          return;
-        }
-        isProcessing = true;
-        this.querySelector('button[type="submit"]').disabled = true;
-        this.querySelector('button[type="submit"]').textContent = '⏳ Saving...';
-      });
+      document
+        .querySelector(".reminder-form")
+        .addEventListener("submit", function (e) {
+          if (isProcessing) {
+            e.preventDefault();
+            return;
+          }
+          isProcessing = true;
+          this.querySelector('button[type="submit"]').disabled = true;
+          this.querySelector('button[type="submit"]').textContent =
+            "⏳ Saving...";
+        });
     </script>
   </body>
 </html>

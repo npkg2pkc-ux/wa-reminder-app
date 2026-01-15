@@ -307,7 +307,7 @@ async function updateLastSent(id, date) {
 async function updateReminderEnabled(id, enabled) {
   try {
     console.log(`🔄 Updating reminder ${id} enabled status to: ${enabled}`);
-    
+
     // Get fresh data to ensure correct row index
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
@@ -344,7 +344,9 @@ async function updateReminderEnabled(id, enabled) {
       },
     });
 
-    console.log(`✅ Reminder ${id} enabled updated to: ${enabled} (row ${targetRowIndex})`);
+    console.log(
+      `✅ Reminder ${id} enabled updated to: ${enabled} (row ${targetRowIndex})`
+    );
     return true;
   } catch (error) {
     console.error("❌ Error updating reminder enabled status:", error.message);
@@ -364,14 +366,14 @@ async function deleteAutoReminder(id) {
   // Prevent concurrent deletes which can cause row index issues
   if (isDeleting) {
     console.log(`⏳ Delete operation in progress, waiting...`);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  
+
   isDeleting = true;
-  
+
   try {
     console.log(`🗑️ Attempting to delete reminder: ${id}`);
-    
+
     // Always get fresh data to ensure correct row index
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
@@ -433,7 +435,9 @@ async function deleteAutoReminder(id) {
       },
     });
 
-    console.log(`✅ Reminder ${id} deleted successfully from row ${targetRowIndex + 1}`);
+    console.log(
+      `✅ Reminder ${id} deleted successfully from row ${targetRowIndex + 1}`
+    );
     return true;
   } catch (error) {
     console.error("❌ Error deleting reminder:", error.message);
